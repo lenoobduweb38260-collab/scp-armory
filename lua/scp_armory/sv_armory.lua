@@ -18,6 +18,15 @@ local function StoreKey(ply)
 	return ply:SteamID64() or ply:SteamID() or tostring(ply:EntIndex())
 end
 
+-- Le joueur est-il à portée d'un casier d'armurerie ?
+function SCPArmory.NearLocker(ply)
+	local maxDist = SCPArmory.Config.UseDistance ^ 2
+	for _, ent in ipairs(ents.FindByClass("scp_armory_locker")) do
+		if ent:GetPos():DistToSqr(ply:GetPos()) <= maxDist then return true end
+	end
+	return false
+end
+
 -- Applique un loadout validé au joueur
 function SCPArmory.Apply(ply, loadout)
 	if not IsValid(ply) or not ply:Alive() then return end
@@ -77,6 +86,11 @@ end
 
 -- Réception du loadout choisi par le client
 net.Receive("SCPArmory_Apply", function(_, ply)
+	if SCPArmory.Config.RequireEntity and not SCPArmory.NearLocker(ply) then
+		Notify(ply, "Vous devez être à proximité d'un casier d'armurerie pour vous équiper.")
+		return
+	end
+
 	local clearance = SCPArmory.GetClearance(ply)
 	local loadout = {}
 	local refused = false
@@ -87,7 +101,7 @@ net.Receive("SCPArmory_Apply", function(_, ply)
 
 		if id == "none" or not item then
 			loadout[slot.key] = "none"
-		elseif (item.clearance or 1) > clearance then
+		elseif (item.clearance or 1) > clearance or not SCPArmory.IsItemAvailable(ply, item) then
 			loadout[slot.key] = "none"
 			refused = true
 		else
@@ -141,8 +155,12 @@ hook.Add("PlayerSay", "SCPArmory_ChatCommand", function(ply, text)
 	local lowered = string.Trim(string.lower(text))
 	for _, cmd in ipairs(SCPArmory.Config.ChatCommands) do
 		if lowered == cmd then
-			net.Start("SCPArmory_Open")
-			net.Send(ply)
+			if SCPArmory.Config.RequireEntity and not SCPArmory.NearLocker(ply) then
+				Notify(ply, "Rendez-vous à un casier d'armurerie pour accéder à votre équipement.")
+			else
+				net.Start("SCPArmory_Open")
+				net.Send(ply)
+			end
 			return ""
 		end
 	end

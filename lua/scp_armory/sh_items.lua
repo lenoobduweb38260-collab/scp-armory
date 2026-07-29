@@ -14,6 +14,10 @@
 --   mobilityMod : bonus/malus direct de mobilité (optionnel)
 --   stats     : { degats, cadence, controle, precision } sur 100 (affichage)
 --   apply     : function(ply) effet spécial au déploiement (optionnel, serveur)
+--   jobs      : { "Nom exact du job", ... } (optionnel) — l'objet n'existe QUE
+--               pour ces jobs/teams : les autres joueurs ne le voient même pas
+--               dans le menu, façon Ready or Not. Sans ce champ : tous les jobs.
+--               Exemple : jobs = { "Chef des FGM", "Opérateur Epsilon-11" }
 
 SCPArmory = SCPArmory or {}
 

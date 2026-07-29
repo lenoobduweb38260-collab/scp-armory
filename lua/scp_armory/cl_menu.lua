@@ -44,6 +44,14 @@ local function LoadSaved()
 		end
 	end
 
+	-- Retire les objets invisibles pour le job actuel (changement de métier, etc.)
+	for _, slot in ipairs(SCPArmory.Slots) do
+		local item = SCPArmory.GetItem(slot.pool, sel[slot.key])
+		if item and not SCPArmory.IsItemAvailable(LocalPlayer(), item) then
+			sel[slot.key] = "none"
+		end
+	end
+
 	return sel, auto
 end
 
@@ -115,9 +123,12 @@ local function OpenMenu()
 	header:Dock(TOP)
 	header:SetTall(62)
 	header:DockMargin(16, 10, 16, 0)
+	local jobName = team.GetName(LocalPlayer():Team()) or ""
+	if jobName == "" then jobName = "Préparation au déploiement" end
+
 	header.Paint = function(_, w, h)
 		draw.SimpleText("ARMURERIE — FONDATION SCP", "SCPArmory_Title", 0, 4, COL.text)
-		draw.SimpleText("FGM EPSILON-11 « NINE-TAILED FOX »  //  SITE-19  //  PRÉPARATION AU DÉPLOIEMENT", "SCPArmory_Sub", 0, 36, COL.dim)
+		draw.SimpleText("SITE-19  //  " .. string.upper(jobName) .. "  //  ARSENAL AUTORISÉ", "SCPArmory_Sub", 0, 36, COL.dim)
 
 		local badge = "ACCRÉDITATION NIVEAU " .. clearance
 		surface.SetFont("SCPArmory_Label")
@@ -452,7 +463,10 @@ local function OpenMenu()
 	RefreshGrid = function()
 		grid:Clear()
 		for _, item in ipairs(SCPArmory.Items[activeSlot.pool]) do
-			BuildTile(item)
+			-- Un objet réservé à un autre job n'apparaît pas du tout
+			if SCPArmory.IsItemAvailable(LocalPlayer(), item) then
+				BuildTile(item)
+			end
 		end
 	end
 
