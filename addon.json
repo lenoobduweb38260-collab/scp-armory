@@ -1,0 +1,9 @@
+{
+	"title": "SCP Armory — Loadout style Ready or Not",
+	"type": "servercontent",
+	"tags": [ "fun", "roleplay" ],
+	"ignore": [
+		"*.md",
+		".git*"
+	]
+}
