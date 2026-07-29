@@ -23,8 +23,18 @@ SCPArmory.Config = {
 	-- d'un casier d'armurerie (entité scp_armory_locker), comme dans Ready or Not
 	RequireEntity = false,
 
-	-- Distance maximale (unités) au casier pour s'équiper quand RequireEntity = true
+	-- Distance maximale (unités) à l'armoire pour s'équiper quand RequireEntity = true
 	UseDistance = 160,
+
+	-- Modèle de l'armoire d'armurerie (entité scp_armory_locker)
+	LockerModel = "models/props_c17/FurnitureDrawer001a.mdl",
+
+	-- Hauteur de l'étiquette 3D2D au-dessus de l'armoire
+	LockerLabelHeight = 58,
+
+	-- Bloque le menu de personnalisation ARC9 (touche C) : les accessoires
+	-- ne se choisissent que via l'armurerie
+	BlockARC9Customize = true,
 
 	-- Vitesses de base sur lesquelles s'applique le multiplicateur de mobilité
 	BaseWalkSpeed = 200,

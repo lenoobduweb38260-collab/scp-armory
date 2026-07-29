@@ -1,19 +1,27 @@
 # SCP Armory
 
-Addon **Garry's Mod** : une armurerie de la Fondation SCP avec un écran de préparation de loadout
-inspiré de **Ready or Not** — sélection par emplacements, aperçu 3D de l'opérateur, poids qui
-pénalise la mobilité, niveaux d'accréditation, restrictions par job et objets anormaux.
+Addon **Garry's Mod** : une armurerie de la Fondation SCP qui recrée les écrans **LOADOUT** et
+**MODIFY WEAPON** de **Ready or Not** — plein écran sur fond noir, colonne d'équipement à gauche,
+opérateur (ou arme) en grand plan, accessoires **ARC9**, poids qui pénalise la mobilité, niveaux
+d'accréditation, restrictions par job et objets anormaux.
 
-![Aperçu du menu](docs/apercu-menu.png)
+![Écran LOADOUT](docs/apercu-loadout.png)
+![Écran MODIFIER L'ARME](docs/apercu-modify.png)
 
 ## Fonctionnalités
 
-- **Menu de loadout façon Ready or Not** (Derma) :
+- **Écran LOADOUT façon Ready or Not** (Derma, plein écran) :
   - 8 emplacements : arme principale, arme secondaire, tactique ×2, grenade, gilet balistique, casque, objet anormal ;
-  - grille d'objets avec icônes 3D, description et statistiques (dégâts, cadence, contrôle, précision) ;
-  - aperçu 3D animé de votre playermodel ;
-  - jauges agrégées en direct : **poids**, **mobilité**, **armure**, **résistance anormale**, avec classe de
-    chargement `LÉGER / INTERMÉDIAIRE / LOURD`.
+  - colonne d'équipement à gauche avec silhouettes d'armes de profil, votre playermodel animé en grand plan ;
+  - descriptions et statistiques (dégâts, cadence, contrôle, précision) au survol ;
+  - résumé du chargement en direct : **poids**, **mobilité**, **armure**, **résistance anormale**, avec classe
+    `LÉGER / INTERMÉDIAIRE / LOURD` ; navigation ÉCHAP comme dans le jeu.
+- **Écran MODIFIER L'ARME façon Ready or Not** (armes principale et secondaire) :
+  - onglets PRINCIPALE / SECONDAIRE, arme en grand plan, panneau récapitulatif des accessoires à droite ;
+  - **intégration ARC9** : les emplacements (optique, bouche, sous-canon…) et les accessoires compatibles sont
+    récupérés automatiquement depuis le registre ARC9 de l'arme — aucune configuration à écrire ;
+  - les accessoires se choisissent **uniquement** ici : le menu de personnalisation ARC9 (touche C) est désactivé
+    (`BlockARC9Customize`) ; le serveur valide et pose les accessoires au déploiement.
 - **Fonctionnel en jeu** au clic sur **DÉPLOYER** :
   - distribution des armes et munitions (validation côté serveur) ;
   - armure appliquée selon gilet + casque ;
@@ -21,9 +29,10 @@ pénalise la mobilité, niveaux d'accréditation, restrictions par job et objets
   - effets des objets anormaux : **SCP-500** (soin complet), **SCP-714** (-25 % de dégâts subis, mobilité réduite),
     **Ancre de Réalité Scranton** (-15 % de dégâts subis, 6,5 kg) ;
   - réapplication optionnelle du chargement au respawn.
-- **Entité armurerie** (`scp_armory_locker`) : un casier à placer sur la map (menu spawn, catégorie
-  *SCP Armory*), avec étiquette 3D2D « ARMURERIE — Appuyez sur [E] ». Appuyer sur **E** ouvre le menu.
-  Avec `RequireEntity = true`, s'équiper n'est possible **qu'à proximité d'un casier**, comme dans Ready or Not.
+- **Entité armoire d'armurerie** (`scp_armory_locker`) : une armoire à placer sur la map (menu spawn,
+  catégorie *SCP Armory*, modèle configurable via `LockerModel`), avec étiquette 3D2D « ARMURERIE —
+  Appuyez sur [E] ». Appuyer sur **E** ouvre le menu. Avec `RequireEntity = true`, s'équiper n'est
+  possible **qu'à proximité d'une armoire**, comme dans Ready or Not.
 - **Restrictions par job/team** : un objet portant un champ `jobs = { ... }` n'apparaît **que** pour ces
   métiers — les autres joueurs ne le voient même pas dans le menu (validation serveur incluse).
 - **Niveaux d'accréditation (1-4)** : les objets verrouillés sont grisés dans le menu et refusés par le
@@ -44,7 +53,7 @@ garrysmod/addons/scp-armory/
 
 ## Utilisation
 
-- **Casier d'armurerie** : spawnez l'entité *Casier d'armurerie SCP* (catégorie *SCP Armory*) et
+- **Armoire d'armurerie** : spawnez l'entité *Armoire d'armurerie SCP* (catégorie *SCP Armory*) et
   appuyez sur **E** dessus.
 - Commande chat : `!armurerie`, `!loadout` ou `!armory`
 - Commande console : `scp_armory` (bindable : `bind F7 scp_armory`)
@@ -59,8 +68,10 @@ Dans `lua/scp_armory/sh_config.lua` :
 | `DefaultClearance` | Accréditation par défaut des joueurs (3 = tout sauf les objets anormaux) |
 | `ClearanceGroups` | Accréditation par groupe (`admin`/`superadmin` = 4 par défaut) |
 | `ClearanceJobs` | Accréditation par job/team, prioritaire — ex. `["Chef des FGM"] = 4` |
-| `RequireEntity` | Si `true`, menu et déploiement uniquement près d'un casier `scp_armory_locker` |
-| `UseDistance` | Portée (en unités) autour du casier quand `RequireEntity = true` |
+| `RequireEntity` | Si `true`, menu et déploiement uniquement près d'une armoire `scp_armory_locker` |
+| `UseDistance` | Portée (en unités) autour de l'armoire quand `RequireEntity = true` |
+| `LockerModel` | Modèle 3D de l'armoire d'armurerie |
+| `BlockARC9Customize` | Si `true`, désactive le menu de personnalisation ARC9 (touche C) |
 | `BaseWalkSpeed` / `BaseRunSpeed` | Vitesses de référence avant malus de poids |
 | `MaxArmor` | Plafond d'armure |
 | `KeepWeapons` | Outils sandbox redonnés après déploiement (physgun, toolgun…) |
@@ -82,6 +93,21 @@ Ajoutez simplement une entrée dans `lua/scp_armory/sh_items.lua`, par exemple :
 ```
 
 L'addon utilise par défaut les armes HL2 de base afin de fonctionner sans aucune dépendance.
+
+## Accessoires ARC9
+
+Si une arme ajoutée dans `sh_items.lua` est une arme **ARC9** (champ `class` pointant vers une
+classe ARC9), l'écran *MODIFIER L'ARME* liste automatiquement ses emplacements de premier niveau
+(`SWEP.Attachments`) et les accessoires compatibles du registre `ARC9.Attachments`. Au déploiement,
+le serveur valide chaque accessoire (emplacement + compatibilité) puis le pose sur l'arme donnée
+(`SWEP:Attach`, avec repli défensif).
+
+- Les joueurs ne passent **jamais** par le menu ARC9 : la touche C est bloquée sur les armes ARC9
+  tant que `BlockARC9Customize = true`.
+- Recommandé côté serveur : `arc9_free_atts 1` (les accessoires sont fournis par l'armurerie).
+- Les emplacements imbriqués (rails ajoutés par un autre accessoire) ne sont pas proposés — seul le
+  premier niveau l'est, pour garder une validation serveur simple et sûre.
+- Sans ARC9 installé, tout le reste de l'addon fonctionne normalement.
 
 ## Réserver des armes à un job (DarkRP)
 

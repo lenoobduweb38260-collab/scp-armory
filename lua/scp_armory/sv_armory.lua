@@ -80,6 +80,23 @@ function SCPArmory.Apply(ply, loadout)
 		end)
 	end
 
+	-- Pose des accessoires ARC9 sur les armes fraîchement données
+	if loadout.atts and next(loadout.atts) ~= nil then
+		timer.Simple(0.3, function()
+			if not IsValid(ply) or not ply:Alive() then return end
+			for wkey, attMap in pairs(loadout.atts) do
+				local id = loadout[wkey]
+				local item = id and id ~= "none" and SCPArmory.GetItem(wkey, id) or nil
+				local wep = item and item.class and ply:GetWeapon(item.class) or nil
+				if IsValid(wep) then
+					for idx, attId in pairs(attMap) do
+						SCPArmory.ARC9Bridge.TryAttach(wep, idx, attId)
+					end
+				end
+			end
+		end)
+	end
+
 	Notify(ply, string.format("Chargement déployé — %.1f kg, mobilité %d%% (%s), armure %d.",
 		stats.weight, stats.mobility, stats.class, stats.armor))
 end
@@ -110,6 +127,32 @@ net.Receive("SCPArmory_Apply", function(_, ply)
 	end
 
 	local autoApply = net.ReadBool()
+
+	-- Accessoires ARC9 choisis pour les armes principale et secondaire,
+	-- validés contre le registre ARC9 (emplacement + compatibilité)
+	local atts = {}
+	for _, wkey in ipairs({ "primary", "secondary" }) do
+		local count = net.ReadUInt(6)
+		local map = {}
+		for _ = 1, count do
+			local idx = net.ReadUInt(6)
+			local attId = net.ReadString()
+			map[idx] = attId
+		end
+
+		local id = loadout[wkey]
+		local item = id and id ~= "none" and SCPArmory.GetItem(wkey, id) or nil
+		if item and item.class and SCPArmory.ARC9Bridge.IsARC9Class(item.class) then
+			local clean = {}
+			for idx, attId in pairs(map) do
+				if SCPArmory.ARC9Bridge.IsCompatible(item.class, idx, attId) then
+					clean[idx] = attId
+				end
+			end
+			if next(clean) ~= nil then atts[wkey] = clean end
+		end
+	end
+	loadout.atts = atts
 
 	local sid = StoreKey(ply)
 	SCPArmory.Stored[sid] = loadout

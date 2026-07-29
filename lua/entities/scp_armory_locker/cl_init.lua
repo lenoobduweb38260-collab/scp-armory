@@ -13,7 +13,7 @@ function ENT:Draw()
 	-- Étiquette 3D2D visible à moins de 500 unités, face au joueur
 	if EyePos():DistToSqr(self:GetPos()) > 250000 then return end
 
-	local pos = self:GetPos() + Vector(0, 0, 80)
+	local pos = self:GetPos() + Vector(0, 0, SCPArmory.Config.LockerLabelHeight or 58)
 	local ang = Angle(0, LocalPlayer():EyeAngles().y - 90, 90)
 
 	cam.Start3D2D(pos, ang, 0.06)
