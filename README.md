@@ -2,19 +2,19 @@
 
 Addon **Garry's Mod** : une armurerie de la Fondation SCP qui recrée les écrans **LOADOUT** et
 **MODIFY WEAPON** de **Ready or Not** — plein écran sur fond noir, colonne d'équipement à gauche,
-opérateur (ou arme) en grand plan, accessoires **ARC9**, poids qui pénalise la mobilité, niveaux
-d'accréditation, restrictions par job et objets anormaux.
+opérateur (ou arme) en grand plan, accessoires **ARC9**, poids qui pénalise la mobilité,
+restrictions par job et **chargement automatique des packs d'armes installés**.
 
 ![Écran LOADOUT](docs/apercu-loadout.png)
 ![Écran MODIFIER L'ARME](docs/apercu-modify.png)
 
 ## Fonctionnalités
 
-- **Écran LOADOUT façon Ready or Not** (Derma, plein écran) :
-  - 8 emplacements : arme principale, arme secondaire, tactique ×2, grenade, gilet balistique, casque, objet anormal ;
-  - colonne d'équipement à gauche avec silhouettes d'armes de profil, votre playermodel animé en grand plan ;
-  - descriptions et statistiques (dégâts, cadence, contrôle, précision) au survol ;
-  - résumé du chargement en direct : **poids**, **mobilité**, **armure**, **résistance anormale**, avec classe
+- **Écran LOADOUT façon Ready or Not** (Derma, plein écran, fondu d'ouverture) :
+  - 7 emplacements : arme principale, arme secondaire, tactique ×2, grenade, gilet balistique, casque ;
+  - colonne d'équipement à gauche sur dégradé sombre, survols animés, votre playermodel en grand plan ;
+  - munitions affichées sur les armes, descriptions et statistiques au survol ;
+  - résumé du chargement en direct : **poids**, **mobilité**, **armure**, avec classe
     `LÉGER / INTERMÉDIAIRE / LOURD` ; navigation ÉCHAP comme dans le jeu.
 - **Écran MODIFIER L'ARME façon Ready or Not** (armes principale et secondaire) :
   - onglets PRINCIPALE / SECONDAIRE, arme en grand plan, panneau récapitulatif des accessoires à droite ;
@@ -23,31 +23,23 @@ d'accréditation, restrictions par job et objets anormaux.
   - les accessoires se choisissent **uniquement** ici : le menu de personnalisation ARC9 (touche C) est désactivé
     (`BlockARC9Customize`) ; le serveur valide et pose les accessoires au déploiement.
 - **DÉPLOYER équipe le joueur et referme le menu** immédiatement.
-- **Icônes par images imgur** : chaque objet peut avoir un champ `icon` (lien direct
-  `https://i.imgur.com/xxxx.png` ou `.jpg`). L'image remplace le rendu 3D dans les vignettes de la
-  colonne, les listes de sélection et le grand plan de l'écran MODIFIER L'ARME. Les images sont
-  téléchargées une fois puis mises en cache dans `data/scp_armory/cache/`.
-- **Panneau de configuration en jeu** (`scp_armory_config`, superadmin — aussi accessible via le
-  bouton CONFIGURATION en haut à droite du menu) : toutes les options générales (armoire obligatoire,
-  blocage ARC9, accréditation par défaut, vitesses, armure max, modèle de l'armoire…) et **l'URL
-  imgur de chaque objet**, avec aperçu. La configuration est sauvegardée côté serveur
-  (`data/scp_armory/server_config.json`) et diffusée à tous les joueurs en direct.
-- **Fonctionnel en jeu** au clic sur **DÉPLOYER** :
-  - distribution des armes et munitions (validation côté serveur) ;
-  - armure appliquée selon gilet + casque ;
-  - vitesse de déplacement recalculée selon le poids total ;
-  - effets des objets anormaux : **SCP-500** (soin complet), **SCP-714** (-25 % de dégâts subis, mobilité réduite),
-    **Ancre de Réalité Scranton** (-15 % de dégâts subis, 6,5 kg) ;
-  - réapplication optionnelle du chargement au respawn.
+- **Chargement automatique des packs d'armes** (`AutoLoadWeapons`) : toutes les armes scriptées
+  spawnables installées (ARC9, M9K, CW…) sont ajoutées automatiquement — emplacement 1 → arme
+  secondaire, emplacements 2/3 → arme principale. Aucune liste à écrire.
+- **Restrictions par job** : chaque objet peut être réservé à certains métiers (nom exact du job
+  DarkRP/team). Les joueurs des autres jobs **ne voient pas du tout** l'objet dans la sélection ;
+  le serveur refuse aussi tout déploiement hors autorisation. Configurable **en jeu**, objet par objet.
+- **Pas de niveaux d'accréditation** : tout objet visible est équipable — la seule limite est le job.
+- **Icônes par images imgur** : chaque objet peut avoir une image (lien direct
+  `https://i.imgur.com/xxxx.png`), qui remplace le rendu 3D dans les vignettes, les listes et le
+  grand plan. Téléchargées une fois puis mises en cache dans `data/scp_armory/cache/`.
+- **Panneau de configuration en jeu** (superadmin) : options générales, image imgur **et jobs
+  autorisés de chaque objet**, avec aperçu. Sauvegardé côté serveur
+  (`data/scp_armory/server_config.json`) et diffusé à tous les joueurs en direct.
 - **Entité armoire d'armurerie** (`scp_armory_locker`) : une armoire à placer sur la map (menu spawn,
-  catégorie *SCP Armory*, modèle configurable via `LockerModel`), avec étiquette 3D2D « ARMURERIE —
-  Appuyez sur [E] ». Appuyer sur **E** ouvre le menu. Avec `RequireEntity = true`, s'équiper n'est
-  possible **qu'à proximité d'une armoire**, comme dans Ready or Not.
-- **Restrictions par job/team** : un objet portant un champ `jobs = { ... }` n'apparaît **que** pour ces
-  métiers — les autres joueurs ne le voient même pas dans le menu (validation serveur incluse).
-- **Niveaux d'accréditation (1-4)** : les objets verrouillés sont grisés dans le menu et refusés par le
-  serveur. Attribuables par groupe (`ClearanceGroups`) ou par job (`ClearanceJobs`).
-- **Sauvegarde locale** du dernier loadout (`data/scp_armory/loadout.txt`).
+  catégorie *SCP Armory*, modèle configurable), étiquette 3D2D « ARMURERIE — Appuyez sur [E] ».
+  Avec `RequireEntity = true`, s'équiper n'est possible **qu'à proximité d'une armoire**.
+- **Sauvegarde locale** du dernier loadout + réapplication optionnelle au respawn.
 
 ## Installation
 
@@ -58,6 +50,7 @@ garrysmod/addons/scp-armory/
 ├── addon.json
 └── lua/
     ├── autorun/scp_armory_init.lua
+    ├── entities/scp_armory_locker/...
     └── scp_armory/...
 ```
 
@@ -67,22 +60,26 @@ garrysmod/addons/scp-armory/
   appuyez sur **E** dessus.
 - Commande chat : `!armurerie`, `!loadout` ou `!armory`
 - Commande console : `scp_armory` (bindable : `bind F7 scp_armory`)
-- Choisissez vos objets par emplacement puis cliquez **DÉPLOYER**.
+- Choisissez vos objets par emplacement puis cliquez **DÉPLOYER** — le menu se referme et vous êtes équipé.
 
 ## Configuration
 
-**En jeu (recommandé)** : en tant que superadmin, tapez `scp_armory_config` en console (ou cliquez
-sur **CONFIGURATION** en haut à droite de l'armurerie). Le panneau règle les options ci-dessous et
-les images imgur des objets, puis sauvegarde côté serveur et synchronise tous les joueurs.
+**En jeu (recommandé, superadmin)** :
+
+- Commande chat : `!armurerieconfig` (ou `!armoryconfig`, `!configarmurerie`)
+- Commande console : `scp_armory_config`
+- Ou le bouton **CONFIGURATION** en haut à droite de l'armurerie.
+
+Le panneau règle les options générales, l'image imgur et les **jobs autorisés** de chaque objet
+(armes auto-chargées comprises), puis sauvegarde côté serveur et synchronise tous les joueurs.
 
 **Dans les fichiers** — `lua/scp_armory/sh_config.lua` (valeurs par défaut, écrasées par la
 configuration en jeu) :
 
 | Option | Rôle |
 | --- | --- |
-| `DefaultClearance` | Accréditation par défaut des joueurs (3 = tout sauf les objets anormaux) |
-| `ClearanceGroups` | Accréditation par groupe (`admin`/`superadmin` = 4 par défaut) |
-| `ClearanceJobs` | Accréditation par job/team, prioritaire — ex. `["Chef des FGM"] = 4` |
+| `AutoLoadWeapons` | Charge automatiquement les armes des packs installés (redémarrage requis) |
+| `AutoLoadBlacklist` | Classes d'armes à exclure du chargement automatique |
 | `RequireEntity` | Si `true`, menu et déploiement uniquement près d'une armoire `scp_armory_locker` |
 | `UseDistance` | Portée (en unités) autour de l'armoire quand `RequireEntity = true` |
 | `LockerModel` | Modèle 3D de l'armoire d'armurerie |
@@ -93,29 +90,20 @@ configuration en jeu) :
 
 ConVar serveur : `scp_armory_autoapply 1/0` — autorise la réapplication du loadout au respawn.
 
-## Ajouter des armes (M9K, CW 2.0, ArcCW…)
+## Limiter les armes par job
 
-Ajoutez simplement une entrée dans `lua/scp_armory/sh_items.lua`, par exemple :
+Dans le panneau de configuration en jeu, chaque objet a un champ **JOBS** : entrez les noms exacts
+des métiers séparés par des virgules (ex. `Agent de sécurité, Chef des FGM`). Champ vide = visible
+par tout le monde. Comme dans Ready or Not, un joueur ne voit **que** l'arsenal de son métier.
 
-```lua
-{
-    id = "m9k_mp5", name = "H&K MP5A5",
-    desc = "PM de dotation des FGM.",
-    weight = 3.1, clearance = 1,
-    class = "m9k_mp5", model = "models/weapons/w_hk_mp5.mdl",
-    stats = { degats = 55, cadence = 82, controle = 75, precision = 62 },
-},
-```
-
-L'addon utilise par défaut les armes HL2 de base afin de fonctionner sans aucune dépendance.
+En code, c'est le champ `jobs = { "Agent de sécurité" }` sur un objet de `sh_items.lua`.
 
 ## Accessoires ARC9
 
-Si une arme ajoutée dans `sh_items.lua` est une arme **ARC9** (champ `class` pointant vers une
-classe ARC9), l'écran *MODIFIER L'ARME* liste automatiquement ses emplacements de premier niveau
-(`SWEP.Attachments`) et les accessoires compatibles du registre `ARC9.Attachments`. Au déploiement,
-le serveur valide chaque accessoire (emplacement + compatibilité) puis le pose sur l'arme donnée
-(`SWEP:Attach`, avec repli défensif).
+Si une arme (écrite à la main ou auto-chargée) est une arme **ARC9**, l'écran *MODIFIER L'ARME*
+liste automatiquement ses emplacements de premier niveau (`SWEP.Attachments`) et les accessoires
+compatibles du registre `ARC9.Attachments`. Au déploiement, le serveur valide chaque accessoire
+(emplacement + compatibilité) puis le pose sur l'arme donnée (`SWEP:Attach`, avec repli défensif).
 
 - Les joueurs ne passent **jamais** par le menu ARC9 : la touche C est bloquée sur les armes ARC9
   tant que `BlockARC9Customize = true`.
@@ -130,26 +118,26 @@ Pour un rendu propre façon Ready or Not, donnez à chaque arme/objet une image 
 imgur** (clic droit sur l'image → « Copier l'adresse de l'image », le lien doit commencer par
 `https://i.imgur.com/` et finir par `.png` ou `.jpg`, idéalement sur fond transparent) :
 
-- **en jeu** : panneau `scp_armory_config` → section *IMAGES DES OBJETS*, collez l'URL, l'aperçu
-  se charge, puis **ENREGISTRER ET DIFFUSER** ;
+- **en jeu** : panneau de configuration → section *OBJETS*, collez l'URL, l'aperçu se charge,
+  puis **ENREGISTRER ET DIFFUSER** ;
 - **dans le code** : champ `icon = "https://i.imgur.com/xxxx.png"` dans `sh_items.lua`.
 
 Sans image, le menu retombe sur le rendu 3D du modèle (`model`). Les images sont mises en cache
 localement (`data/scp_armory/cache/`) et ne sont téléchargées qu'une seule fois par client.
 
-## Réserver des armes à un job (DarkRP)
+## Ajouter des armes à la main
 
-Ajoutez un champ `jobs` à n'importe quel objet de `sh_items.lua` avec le **nom exact** du job :
+Le chargement automatique couvre la plupart des cas. Pour une entrée sur mesure (nom français,
+stats affichées, munitions précises), ajoutez un objet dans `lua/scp_armory/sh_items.lua` :
 
 ```lua
 {
-    id = "ar2", name = "Fusil à impulsions « Suppression »",
-    -- ... le reste de la définition ...
-    jobs = { "Opérateur Epsilon-11", "Chef des FGM" },
+    id = "m9k_mp5", name = "H&K MP5A5",
+    desc = "PM de dotation des FGM.",
+    weight = 3.1,
+    class = "m9k_mp5", model = "models/weapons/w_hk_mp5.mdl",
+    icon = "https://i.imgur.com/XXXXXXX.png",
+    jobs = { "Agent de sécurité" },
+    stats = { degats = 55, cadence = 82, controle = 75, precision = 62 },
 },
 ```
-
-Comme dans Ready or Not, les joueurs des autres métiers **ne voient pas du tout** cet objet dans
-le menu ; le serveur refuse aussi tout déploiement hors autorisation. Sans champ `jobs`, l'objet
-est visible par tout le monde. Combinez avec `ClearanceJobs` pour donner un niveau d'accréditation
-à chaque métier.

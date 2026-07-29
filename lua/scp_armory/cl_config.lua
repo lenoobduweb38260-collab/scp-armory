@@ -1,9 +1,10 @@
 -- SCP Armory — synchronisation de la configuration + panneau de configuration en jeu
--- Le panneau (superadmin) permet de régler toutes les options du menu et
--- d'associer une image imgur à chaque objet de l'armurerie.
+-- Le panneau (superadmin) règle toutes les options du menu, l'image imgur et
+-- les jobs autorisés de chaque objet de l'armurerie.
 
 SCPArmory = SCPArmory or {}
 SCPArmory.ItemIcons = SCPArmory.ItemIcons or {}
+SCPArmory.ItemJobs = SCPArmory.ItemJobs or {}
 
 -- ------------------------------------------------------------- synchronisation
 
@@ -18,22 +19,33 @@ net.Receive("SCPArmory_Config", function()
 		end
 	end
 
-	-- Remise à zéro puis application des icônes reçues
+	-- Remise à zéro puis application des icônes / restrictions reçues
 	for _, items in pairs(SCPArmory.Items) do
-		for _, item in ipairs(items) do item.icon = nil end
+		for _, item in ipairs(items) do
+			item.icon = nil
+			item.jobs = nil
+		end
 	end
-	SCPArmory.ItemIcons = {}
 
+	SCPArmory.ItemIcons = {}
 	if istable(data.icons) then
 		for key, url in pairs(data.icons) do
-			local pool, id = string.match(tostring(key), "^([%w_]+)/([%w_]+)$")
-			local item = pool and SCPArmory.GetItem(pool, id)
-			if item and isstring(url) and url ~= "" then
+			if isstring(key) and isstring(url) and url ~= "" then
 				SCPArmory.ItemIcons[key] = url
-				item.icon = url
 			end
 		end
 	end
+
+	SCPArmory.ItemJobs = {}
+	if istable(data.jobs) then
+		for key, jobs in pairs(data.jobs) do
+			if isstring(key) and istable(jobs) and #jobs > 0 then
+				SCPArmory.ItemJobs[key] = jobs
+			end
+		end
+	end
+
+	SCPArmory.ApplyPendingItemConfig()
 end)
 
 hook.Add("InitPostEntity", "SCPArmory_RequestConfig", function()
@@ -67,21 +79,20 @@ local POOL_LABELS = {
 	{ pool = "grenade",   label = "GRENADES" },
 	{ pool = "armor",     label = "GILETS" },
 	{ pool = "helmet",    label = "CASQUES" },
-	{ pool = "anomaly",   label = "OBJETS ANORMAUX" },
 }
 
 local activeConfig = nil
 
 function SCPArmory.OpenConfigMenu()
 	if not LocalPlayer():IsSuperAdmin() then
-		chat.AddText(Color(190, 34, 28), "[ARMURERIE] ", COL.text, "Réservé aux superadmins.")
+		chat.AddText(COL.red, "[ARMURERIE] ", COL.text, "Réservé aux superadmins.")
 		return
 	end
 
 	if IsValid(activeConfig) then activeConfig:Remove() end
 
-	local W = math.min(940, ScrW() - 80)
-	local H = math.min(720, ScrH() - 80)
+	local W = math.min(1020, ScrW() - 80)
+	local H = math.min(760, ScrH() - 60)
 
 	local frame = vgui.Create("DFrame")
 	activeConfig = frame
@@ -132,6 +143,16 @@ function SCPArmory.OpenConfigMenu()
 		end
 	end
 
+	local function Note(text)
+		local pnl = scroll:Add("DPanel")
+		pnl:Dock(TOP)
+		pnl:DockMargin(0, 2, 12, 2)
+		pnl:SetTall(18)
+		pnl.Paint = function()
+			draw.SimpleText(text, "SCPArmory_Cfg_Small", 0, 2, COL.dim)
+		end
+	end
+
 	-- ------------------------------------------------------------- général
 
 	local checks, nums = {}, {}
@@ -153,7 +174,7 @@ function SCPArmory.OpenConfigMenu()
 		checks[key] = chk
 	end
 
-	local function AddNumber(key, label, minV, maxV, decimals)
+	local function AddNumber(key, label, minV, maxV)
 		local pnl = scroll:Add("DPanel")
 		pnl:Dock(TOP)
 		pnl:DockMargin(0, 2, 12, 0)
@@ -165,7 +186,7 @@ function SCPArmory.OpenConfigMenu()
 		slider:SetText(label)
 		slider:SetMin(minV)
 		slider:SetMax(maxV)
-		slider:SetDecimals(decimals or 0)
+		slider:SetDecimals(0)
 		slider:SetValue(SCPArmory.Config[key] or minV)
 		slider.Label:SetTextColor(COL.text)
 		slider.Label:SetFont("SCPArmory_Cfg_Small")
@@ -175,7 +196,7 @@ function SCPArmory.OpenConfigMenu()
 	Section("GÉNÉRAL")
 	AddCheck("RequireEntity", "N'autoriser le menu et le déploiement qu'à proximité d'une armoire d'armurerie")
 	AddCheck("BlockARC9Customize", "Désactiver le menu de personnalisation ARC9 (touche C) — accessoires via l'armurerie uniquement")
-	AddNumber("DefaultClearance", "Accréditation par défaut (1-4)", 1, 4)
+	AddCheck("AutoLoadWeapons", "Charger automatiquement les armes des packs installés (ARC9, M9K…) — appliqué au prochain redémarrage")
 	AddNumber("UseDistance", "Portée autour de l'armoire (unités)", 60, 512)
 	AddNumber("BaseWalkSpeed", "Vitesse de marche de base", 80, 400)
 	AddNumber("BaseRunSpeed", "Vitesse de course de base", 150, 700)
@@ -192,27 +213,18 @@ function SCPArmory.OpenConfigMenu()
 
 		lockerEntry = vgui.Create("DTextEntry", pnl)
 		lockerEntry:Dock(RIGHT)
-		lockerEntry:SetWide(560)
+		lockerEntry:SetWide(620)
 		lockerEntry:SetFont("SCPArmory_Cfg_Small")
 		lockerEntry:SetText(SCPArmory.Config.LockerModel or "")
 	end
 
-	-- ------------------------------------------------- images des objets
+	-- ----------------------------------------- objets : images + jobs
 
-	Section("IMAGES DES OBJETS — LIENS DIRECTS IMGUR (i.imgur.com, .png ou .jpg)")
+	Section("OBJETS — IMAGE IMGUR ET JOBS AUTORISÉS")
+	Note("Image : lien direct i.imgur.com en .png ou .jpg (vide = rendu 3D du modèle).")
+	Note("Jobs : noms exacts des métiers séparés par des virgules (vide = tous les jobs voient l'objet).")
 
-	do
-		local note = scroll:Add("DPanel")
-		note:Dock(TOP)
-		note:DockMargin(0, 2, 12, 4)
-		note:SetTall(18)
-		note.Paint = function()
-			draw.SimpleText("L'image remplace le rendu 3D dans le menu (vignettes et grand plan). Champ vide = rendu 3D du modèle.",
-				"SCPArmory_Cfg_Small", 0, 2, COL.dim)
-		end
-	end
-
-	local iconEntries = {}
+	local iconEntries, jobEntries = {}, {}
 
 	for _, group in ipairs(POOL_LABELS) do
 		local items = SCPArmory.Items[group.pool] or {}
@@ -224,7 +236,7 @@ function SCPArmory.OpenConfigMenu()
 		if #shown > 0 then
 			local head = scroll:Add("DPanel")
 			head:Dock(TOP)
-			head:DockMargin(0, 8, 12, 2)
+			head:DockMargin(0, 10, 12, 2)
 			head:SetTall(18)
 			head.Paint = function()
 				draw.SimpleText(group.label, "SCPArmory_Cfg_Small", 0, 2, COL.faint)
@@ -235,18 +247,20 @@ function SCPArmory.OpenConfigMenu()
 
 				local row = scroll:Add("DPanel")
 				row:Dock(TOP)
-				row:DockMargin(0, 2, 12, 0)
-				row:SetTall(30)
+				row:DockMargin(0, 3, 12, 0)
+				row:SetTall(52)
 				row.Paint = function(_, w, h)
-					draw.SimpleText(item.name, "SCPArmory_Cfg_Small", 0, h / 2, COL.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+					draw.SimpleText(item.name, "SCPArmory_Cfg_Small", 0, 4, COL.text)
+					draw.SimpleText("IMAGE", "SCPArmory_Cfg_Small", 250, 8, COL.faint)
+					draw.SimpleText("JOBS", "SCPArmory_Cfg_Small", 250, 32, COL.faint)
+					surface.SetDrawColor(COL.line)
+					surface.DrawRect(0, h - 1, w, 1)
 				end
 
 				-- Aperçu de l'image une fois chargée
 				local prev = vgui.Create("DPanel", row)
-				prev:Dock(RIGHT)
-				prev:SetWide(64)
-				prev:DockMargin(6, 2, 0, 2)
-				prev.Paint = function(s, w, h)
+				prev:SetSize(64, 44)
+				prev.Paint = function(_, w, h)
 					surface.SetDrawColor(COL.line)
 					surface.DrawOutlinedRect(0, 0, w, h, 1)
 					local url = iconEntries[key] and iconEntries[key]:GetValue() or ""
@@ -255,14 +269,25 @@ function SCPArmory.OpenConfigMenu()
 					end
 				end
 
-				local entry = vgui.Create("DTextEntry", row)
-				entry:Dock(RIGHT)
-				entry:SetWide(430)
-				entry:DockMargin(6, 3, 0, 3)
-				entry:SetFont("SCPArmory_Cfg_Small")
-				entry:SetPlaceholderText("https://i.imgur.com/XXXXXXX.png")
-				entry:SetText(SCPArmory.ItemIcons[key] or "")
-				iconEntries[key] = entry
+				local iconEntry = vgui.Create("DTextEntry", row)
+				iconEntry:SetFont("SCPArmory_Cfg_Small")
+				iconEntry:SetPlaceholderText("https://i.imgur.com/XXXXXXX.png")
+				iconEntry:SetText(SCPArmory.ItemIcons[key] or "")
+				iconEntries[key] = iconEntry
+
+				local jobEntry = vgui.Create("DTextEntry", row)
+				jobEntry:SetFont("SCPArmory_Cfg_Small")
+				jobEntry:SetPlaceholderText("Agent de sécurité, Chef des FGM (vide = tous)")
+				jobEntry:SetText(table.concat(SCPArmory.ItemJobs[key] or {}, ", "))
+				jobEntries[key] = jobEntry
+
+				row.PerformLayout = function(_, w, h)
+					prev:SetPos(w - 70, 4)
+					iconEntry:SetPos(300, 4)
+					iconEntry:SetSize(w - 380, 20)
+					jobEntry:SetPos(300, 28)
+					jobEntry:SetSize(w - 380, 20)
+				end
 			end
 		end
 	end
@@ -280,7 +305,7 @@ function SCPArmory.OpenConfigMenu()
 			COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
 	saveBtn.DoClick = function()
-		local payload = { config = {}, icons = {} }
+		local payload = { config = {}, icons = {}, jobs = {} }
 
 		for key, chk in pairs(checks) do
 			payload.config[key] = chk:GetChecked() and true or false
@@ -295,6 +320,10 @@ function SCPArmory.OpenConfigMenu()
 			if url == "" or string.find(url, "^https?://") then
 				payload.icons[key] = url
 			end
+		end
+
+		for key, entry in pairs(jobEntries) do
+			payload.jobs[key] = string.Trim(entry:GetValue() or "")
 		end
 
 		local comp = util.Compress(util.TableToJSON(payload))
@@ -326,3 +355,5 @@ end
 
 concommand.Add("scp_armory_config", SCPArmory.OpenConfigMenu, nil,
 	"Ouvre le panneau de configuration de l'armurerie (superadmin).")
+
+net.Receive("SCPArmory_OpenConfig", SCPArmory.OpenConfigMenu)

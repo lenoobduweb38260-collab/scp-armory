@@ -74,10 +74,6 @@ local function FitModelSide(panel)
 	panel.LayoutEntity = function() end
 end
 
-local function IsLocked(item, clearance)
-	return (item.clearance or 1) > clearance
-end
-
 local function HasModel(item)
 	return item and item.model and file.Exists(item.model, "GAME")
 end
@@ -151,7 +147,6 @@ local function OpenMenu()
 	if IsValid(activeMenu) then activeMenu:Remove() end
 
 	local selection, autoApply, attSel = LoadSaved()
-	local clearance = SCPArmory.GetClearance(LocalPlayer())
 	local plyModel = LocalPlayer():GetModel()
 
 	local jobName = team.GetName(LocalPlayer():Team()) or ""
@@ -179,14 +174,27 @@ local function OpenMenu()
 	frame:ShowCloseButton(false)
 	frame:SetDraggable(false)
 	frame:MakePopup()
+
+	-- Fondu d'ouverture
+	frame:SetAlpha(0)
+	frame:AlphaTo(255, 0.18, 0)
+
 	frame.Paint = function(_, w, h)
 		surface.SetDrawColor(COL.bg)
 		surface.DrawRect(0, 0, w, h)
+
+		-- Dégradé sombre derrière la colonne pour la lisibilité, façon RoN
+		local gw = 560
+		local steps = 28
+		local band = gw / steps
+		for i = 0, steps - 1 do
+			surface.SetDrawColor(0, 0, 0, 190 * (1 - i / steps))
+			surface.DrawRect(i * band, 0, math.ceil(band), h)
+		end
 	end
 	frame.PaintOver = function(_, w, h)
 		draw.SimpleText("SCP ARMORY — SITE-19", "SCPArmory_RoN_Small", w - 26, 18, COL.dim, TEXT_ALIGN_RIGHT)
-		draw.SimpleText("ACCRÉDITATION NIVEAU " .. clearance .. "  //  " .. SCPArmory.FrUpper(jobName),
-			"SCPArmory_RoN_Small", w - 26, 34, COL.faint, TEXT_ALIGN_RIGHT)
+		draw.SimpleText(SCPArmory.FrUpper(jobName), "SCPArmory_RoN_Small", w - 26, 34, COL.faint, TEXT_ALIGN_RIGHT)
 	end
 
 	-- ------------------------------------------------------ aperçu central
@@ -305,7 +313,7 @@ local function OpenMenu()
 	local colX, colY = 48, 34
 	local colW = 350
 	local colH = ScrH() - colY * 2
-	local bottomH = 208
+	local bottomH = 184
 	local titleH = 112
 
 	local column = vgui.Create("DPanel", frame)
@@ -430,10 +438,6 @@ local function OpenMenu()
 			local item = hoverItem
 			if item then
 				draw.SimpleText(SCPArmory.FrUpper(item.name), "SCPArmory_RoN_Label", 0, 8, COL.text)
-				if IsLocked(item, clearance) then
-					draw.SimpleText("ACCRÉDITATION NIVEAU " .. item.clearance .. " REQUISE", "SCPArmory_RoN_Label",
-						w - 10, 8, COL.red, TEXT_ALIGN_RIGHT)
-				end
 
 				local infos = {}
 				if item.stats then
@@ -443,9 +447,8 @@ local function OpenMenu()
 					if item.stats.precision then table.insert(infos, "PRÉCISION " .. item.stats.precision) end
 				end
 				if item.armor then table.insert(infos, "ARMURE +" .. item.armor) end
-				if item.resist then table.insert(infos, "RÉSISTANCE " .. math.Round(item.resist * 100) .. " %") end
 				table.insert(infos, string.format("%.1f KG", item.weight or 0))
-				draw.SimpleText(table.concat(infos, "   ·   "), "SCPArmory_RoN_Small", 0, 96, COL.faint)
+				draw.SimpleText(table.concat(infos, "   ·   "), "SCPArmory_RoN_Small", 0, 92, COL.faint)
 			end
 			return
 		end
@@ -468,7 +471,6 @@ local function OpenMenu()
 			{ "POIDS", string.format("%.1f KG", stats.weight), stats.weight / 30 },
 			{ "MOBILITÉ", stats.mobility .. " %", stats.mobility / 110 },
 			{ "ARMURE", stats.armor .. " PTS", stats.armor / SCPArmory.Config.MaxArmor },
-			{ "RÉSISTANCE ANORMALE", math.Round(stats.resist * 100) .. " %", stats.resist / 0.5 },
 		}
 
 		local y = 30
@@ -483,13 +485,28 @@ local function OpenMenu()
 		end
 	end
 
-	local autoChk = vgui.Create("DCheckBoxLabel", bottom)
+	-- Case à cocher stylée RoN (la DCheckBoxLabel de base jure avec le thème)
+	local autoChk = vgui.Create("DButton", bottom)
 	autoChk:SetPos(0, bottomH - 76)
 	autoChk:SetSize(colW, 20)
-	autoChk:SetText("Réappliquer ce chargement au respawn")
-	autoChk:SetFont("SCPArmory_RoN_Small")
-	autoChk:SetTextColor(COL.dim)
-	autoChk:SetValue(autoApply)
+	autoChk:SetText("")
+	autoChk.checked = autoApply
+	autoChk.GetChecked = function(s) return s.checked end
+	autoChk.Paint = function(s, _, h)
+		local hov = s:IsHovered()
+		surface.SetDrawColor(hov and COL.text or COL.line)
+		surface.DrawOutlinedRect(0, 3, 14, 14, 1)
+		if s.checked then
+			surface.SetDrawColor(COL.red)
+			surface.DrawRect(3, 6, 8, 8)
+		end
+		draw.SimpleText("Réappliquer ce chargement au respawn", "SCPArmory_RoN_Small", 22, h / 2,
+			hov and COL.soft or COL.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+	end
+	autoChk.DoClick = function(s)
+		s.checked = not s.checked
+		surface.PlaySound("ui/buttonclick.wav")
+	end
 
 	local deployBtn = vgui.Create("DButton", bottom)
 	deployBtn:SetPos(0, bottomH - 46)
@@ -607,6 +624,14 @@ local function OpenMenu()
 
 		btn.Paint = function(s, w, h)
 			local hov = s:IsHovered()
+			s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
+
+			if s.hf > 0.01 then
+				surface.SetDrawColor(255, 255, 255, 6 * s.hf)
+				surface.DrawRect(0, 0, w, h)
+				surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * s.hf)
+				surface.DrawRect(-8, 0, 2, h)
+			end
 
 			if withImage and item and item.icon then
 				SCPArmory.DrawWebIcon(item.icon, 0, 3, 170, 46)
@@ -616,15 +641,14 @@ local function OpenMenu()
 				draw.SimpleText(slot.label, "SCPArmory_RoN_Label", 0, 52, COL.dim)
 				DrawSpacedText(SCPArmory.FrUpper(item and item.name or "— AUCUN —"), "SCPArmory_RoN_Name", 0, 66,
 					hov and COL.text or COL.soft, 1)
+				if item and item.ammo and item.ammo[1] then
+					draw.SimpleText("×" .. item.ammo[1].amount, "SCPArmory_RoN_Small", w - 10, 70,
+						COL.faint, TEXT_ALIGN_RIGHT)
+				end
 			else
 				draw.SimpleText(slot.label, "SCPArmory_RoN_Label", 0, 6, COL.dim)
 				DrawSpacedText(SCPArmory.FrUpper(item and item.name or "— AUCUN —"), "SCPArmory_RoN_NameSm", 0, 22,
 					hov and COL.text or COL.soft, 1)
-			end
-
-			if hov then
-				surface.SetDrawColor(COL.red)
-				surface.DrawRect(-8, 0, 2, h)
 			end
 
 			surface.SetDrawColor(COL.lineF)
@@ -649,7 +673,6 @@ local function OpenMenu()
 
 	-- Ligne de la vue de sélection d'objet
 	local function AddSelectRow(item)
-		local locked = IsLocked(item, clearance)
 		local equipped = selection[selectSlot.key] == item.id
 
 		local btn = scroll:Add("DButton")
@@ -665,32 +688,34 @@ local function OpenMenu()
 			icon:SetModel(item.model)
 			icon:SetMouseInputEnabled(false)
 			FitModelSide(icon)
-			if locked then icon:SetColor(Color(255, 255, 255, 70)) end
 		end
 
 		btn.Paint = function(s, w, h)
 			local hov = s:IsHovered()
-			local nameCol = locked and COL.faint or (equipped or hov) and COL.text or COL.soft
+			s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
+
+			if s.hf > 0.01 then
+				surface.SetDrawColor(255, 255, 255, 6 * s.hf)
+				surface.DrawRect(0, 0, w, h)
+				surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * s.hf)
+				surface.DrawRect(-8, 0, 2, h)
+			end
+			if equipped then
+				surface.SetDrawColor(COL.red)
+				surface.DrawRect(-8, 0, 2, h)
+			end
 
 			if item.icon then
 				SCPArmory.DrawWebIcon(item.icon, 6, 9, 96, 40)
 			end
 
-			if equipped then
-				surface.SetDrawColor(COL.red)
-				surface.DrawRect(-8, 0, 2, h)
-			end
-			if hov then
-				surface.SetDrawColor(255, 255, 255, 4)
-				surface.DrawRect(0, 0, w, h)
-			end
-
+			local nameCol = (equipped or hov) and COL.text or COL.soft
 			DrawSpacedText(SCPArmory.FrUpper(item.name), "SCPArmory_RoN_NameSm", 112, 10, nameCol, 1)
 
 			draw.SimpleText(string.format("%.1f KG", item.weight or 0), "SCPArmory_RoN_Small", 112, 32, COL.faint)
-			if (item.clearance or 1) > 1 then
-				draw.SimpleText("NIVEAU " .. item.clearance, "SCPArmory_RoN_Small", w - 10, 32,
-					locked and COL.red or COL.faint, TEXT_ALIGN_RIGHT)
+			if item.ammo and item.ammo[1] then
+				draw.SimpleText("×" .. item.ammo[1].amount, "SCPArmory_RoN_Small", w - 10, 32,
+					COL.faint, TEXT_ALIGN_RIGHT)
 			end
 
 			surface.SetDrawColor(COL.lineF)
@@ -704,10 +729,6 @@ local function OpenMenu()
 
 		btn.DoClick = function()
 			hoverItem = item
-			if locked then
-				surface.PlaySound("buttons/button10.wav")
-				return
-			end
 
 			if selection[selectSlot.key] ~= item.id then
 				selection[selectSlot.key] = item.id
@@ -954,8 +975,8 @@ local function OpenMenu()
 				AddOverviewEntry(SlotByKey(key), true)
 			end
 
-			AddSection("PROTECTION & ANOMALIE")
-			for _, key in ipairs({ "armor", "helmet", "anomaly" }) do
+			AddSection("PROTECTION")
+			for _, key in ipairs({ "armor", "helmet" }) do
 				AddOverviewEntry(SlotByKey(key), false)
 			end
 		elseif mode == "modify" then

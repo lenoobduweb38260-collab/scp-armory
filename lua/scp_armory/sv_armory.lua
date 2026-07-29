@@ -1,7 +1,9 @@
--- SCP Armory — logique serveur : validation, application du loadout, effets
+-- SCP Armory — logique serveur : validation, application du loadout,
+-- configuration en jeu et effets
 
 util.AddNetworkString("SCPArmory_Apply")
 util.AddNetworkString("SCPArmory_Open")
+util.AddNetworkString("SCPArmory_OpenConfig")
 util.AddNetworkString("SCPArmory_Config")
 util.AddNetworkString("SCPArmory_SaveConfig")
 util.AddNetworkString("SCPArmory_RequestConfig")
@@ -9,8 +11,8 @@ util.AddNetworkString("SCPArmory_RequestConfig")
 local cvarAutoApply = CreateConVar("scp_armory_autoapply", "1", FCVAR_ARCHIVE,
 	"Réapplique automatiquement le dernier loadout au respawn (si le joueur l'a demandé).")
 
-SCPArmory.Stored = SCPArmory.Stored or {}   -- SteamID64 -> loadout
-SCPArmory.AutoFlag = SCPArmory.AutoFlag or {} -- SteamID64 -> bool (réappliquer au respawn)
+SCPArmory.Stored = SCPArmory.Stored or {}   -- clé joueur -> loadout
+SCPArmory.AutoFlag = SCPArmory.AutoFlag or {} -- clé joueur -> bool (réappliquer au respawn)
 
 local function Notify(ply, msg)
 	if IsValid(ply) then ply:ChatPrint("[ARMURERIE] " .. msg) end
@@ -21,7 +23,7 @@ local function StoreKey(ply)
 	return ply:SteamID64() or ply:SteamID() or tostring(ply:EntIndex())
 end
 
--- Le joueur est-il à portée d'un casier d'armurerie ?
+-- Le joueur est-il à portée d'une armoire d'armurerie ?
 function SCPArmory.NearLocker(ply)
 	local maxDist = SCPArmory.Config.UseDistance ^ 2
 	for _, ent in ipairs(ents.FindByClass("scp_armory_locker")) do
@@ -60,9 +62,6 @@ function SCPArmory.Apply(ply, loadout)
 						ply:GiveAmmo(a.amount, a.type, true)
 					end
 				end
-				if item.apply then
-					item.apply(ply)
-				end
 			end
 		end
 	end
@@ -72,8 +71,6 @@ function SCPArmory.Apply(ply, loadout)
 	local mult = stats.mobility / 100
 	ply:SetWalkSpeed(math.Round(cfg.BaseWalkSpeed * mult))
 	ply:SetRunSpeed(math.Round(cfg.BaseRunSpeed * mult))
-
-	ply.SCPArmoryResist = stats.resist
 
 	if firstWeapon then
 		timer.Simple(0.1, function()
@@ -107,11 +104,10 @@ end
 -- Réception du loadout choisi par le client
 net.Receive("SCPArmory_Apply", function(_, ply)
 	if SCPArmory.Config.RequireEntity and not SCPArmory.NearLocker(ply) then
-		Notify(ply, "Vous devez être à proximité d'un casier d'armurerie pour vous équiper.")
+		Notify(ply, "Vous devez être à proximité d'une armoire d'armurerie pour vous équiper.")
 		return
 	end
 
-	local clearance = SCPArmory.GetClearance(ply)
 	local loadout = {}
 	local refused = false
 
@@ -121,7 +117,7 @@ net.Receive("SCPArmory_Apply", function(_, ply)
 
 		if id == "none" or not item then
 			loadout[slot.key] = "none"
-		elseif (item.clearance or 1) > clearance or not SCPArmory.IsItemAvailable(ply, item) then
+		elseif not SCPArmory.IsItemAvailable(ply, item) then
 			loadout[slot.key] = "none"
 			refused = true
 		else
@@ -162,7 +158,7 @@ net.Receive("SCPArmory_Apply", function(_, ply)
 	SCPArmory.AutoFlag[sid] = autoApply
 
 	if refused then
-		Notify(ply, "Certains objets dépassent votre accréditation (niveau " .. clearance .. ") et ont été retirés.")
+		Notify(ply, "Certains objets ne sont pas autorisés pour votre métier et ont été retirés.")
 	end
 
 	SCPArmory.Apply(ply, loadout)
@@ -170,7 +166,6 @@ end)
 
 -- Réapplication au respawn + remise à zéro des effets
 hook.Add("PlayerSpawn", "SCPArmory_Respawn", function(ply)
-	ply.SCPArmoryResist = 0
 	ply:SetWalkSpeed(SCPArmory.Config.BaseWalkSpeed)
 	ply:SetRunSpeed(SCPArmory.Config.BaseRunSpeed)
 
@@ -187,25 +182,29 @@ hook.Add("PlayerSpawn", "SCPArmory_Respawn", function(ply)
 	end)
 end)
 
--- Résistance aux dégâts des objets anormaux
-hook.Add("EntityTakeDamage", "SCPArmory_Resist", function(target, dmg)
-	if not target:IsPlayer() then return end
-	local resist = target.SCPArmoryResist or 0
-	if resist > 0 then
-		dmg:ScaleDamage(1 - resist)
-	end
-end)
-
--- Commandes chat : ouvre le menu côté client
+-- Commandes chat : armurerie + panneau de configuration
 hook.Add("PlayerSay", "SCPArmory_ChatCommand", function(ply, text)
 	local lowered = string.Trim(string.lower(text))
+
 	for _, cmd in ipairs(SCPArmory.Config.ChatCommands) do
 		if lowered == cmd then
 			if SCPArmory.Config.RequireEntity and not SCPArmory.NearLocker(ply) then
-				Notify(ply, "Rendez-vous à un casier d'armurerie pour accéder à votre équipement.")
+				Notify(ply, "Rendez-vous à une armoire d'armurerie pour accéder à votre équipement.")
 			else
 				net.Start("SCPArmory_Open")
 				net.Send(ply)
+			end
+			return ""
+		end
+	end
+
+	for _, cmd in ipairs(SCPArmory.Config.ConfigChatCommands) do
+		if lowered == cmd then
+			if ply:IsSuperAdmin() then
+				net.Start("SCPArmory_OpenConfig")
+				net.Send(ply)
+			else
+				Notify(ply, "Le panneau de configuration est réservé aux superadmins.")
 			end
 			return ""
 		end
@@ -229,7 +228,7 @@ local CONFIG_FILE = "scp_armory/server_config.json"
 local EDITABLE = {
 	RequireEntity      = "boolean",
 	BlockARC9Customize = "boolean",
-	DefaultClearance   = "number",
+	AutoLoadWeapons    = "boolean",
 	UseDistance        = "number",
 	BaseWalkSpeed      = "number",
 	BaseRunSpeed       = "number",
@@ -237,7 +236,23 @@ local EDITABLE = {
 	LockerModel        = "string",
 }
 
-SCPArmory.ItemIcons = SCPArmory.ItemIcons or {} -- "pool/id" -> URL imgur
+-- Transforme "Job A, Job B" (ou une table) en liste propre de noms de jobs
+local function ParseJobs(v)
+	local list = {}
+	if isstring(v) then
+		for part in string.gmatch(v, "[^,]+") do
+			part = string.Trim(part)
+			if part ~= "" then table.insert(list, part) end
+		end
+	elseif istable(v) then
+		for _, part in ipairs(v) do
+			if isstring(part) and string.Trim(part) ~= "" then
+				table.insert(list, string.Trim(part))
+			end
+		end
+	end
+	return list
+end
 
 local function ApplyOverrides(data)
 	if istable(data.config) then
@@ -248,32 +263,40 @@ local function ApplyOverrides(data)
 				SCPArmory.Config[k] = v
 			end
 		end
-		SCPArmory.Config.DefaultClearance = math.Clamp(math.Round(SCPArmory.Config.DefaultClearance), 1, 4)
 	end
 
+	-- Icônes : stockées même si l'objet n'existe pas encore
+	-- (armes auto-chargées après le chargement de la config)
 	if istable(data.icons) then
 		for key, url in pairs(data.icons) do
-			if isstring(key) and isstring(url) and #url < 300 then
-				local pool, id = string.match(key, "^([%w_]+)/([%w_]+)$")
-				local item = pool and SCPArmory.GetItem(pool, id)
-				if item then
-					if url == "" then
-						SCPArmory.ItemIcons[key] = nil
-						item.icon = nil
-					elseif string.find(url, "^https?://") then
-						SCPArmory.ItemIcons[key] = url
-						item.icon = url
-					end
+			if isstring(key) and isstring(url) and #url < 300
+				and string.match(key, "^[%w_]+/[%w_]+$") then
+				if url == "" then
+					SCPArmory.ItemIcons[key] = nil
+				elseif string.find(url, "^https?://") then
+					SCPArmory.ItemIcons[key] = url
 				end
 			end
 		end
 	end
+
+	-- Restrictions par job, même principe
+	if istable(data.jobs) then
+		for key, v in pairs(data.jobs) do
+			if isstring(key) and string.match(key, "^[%w_]+/[%w_]+$") then
+				local list = ParseJobs(v)
+				SCPArmory.ItemJobs[key] = (#list > 0) and list or nil
+			end
+		end
+	end
+
+	SCPArmory.ApplyPendingItemConfig()
 end
 
 local function CurrentConfigPayload()
 	local cfg = {}
 	for k in pairs(EDITABLE) do cfg[k] = SCPArmory.Config[k] end
-	return { config = cfg, icons = SCPArmory.ItemIcons }
+	return { config = cfg, icons = SCPArmory.ItemIcons, jobs = SCPArmory.ItemJobs }
 end
 
 local function SaveConfigToDisk()
