@@ -22,6 +22,16 @@ d'accréditation, restrictions par job et objets anormaux.
     récupérés automatiquement depuis le registre ARC9 de l'arme — aucune configuration à écrire ;
   - les accessoires se choisissent **uniquement** ici : le menu de personnalisation ARC9 (touche C) est désactivé
     (`BlockARC9Customize`) ; le serveur valide et pose les accessoires au déploiement.
+- **DÉPLOYER équipe le joueur et referme le menu** immédiatement.
+- **Icônes par images imgur** : chaque objet peut avoir un champ `icon` (lien direct
+  `https://i.imgur.com/xxxx.png` ou `.jpg`). L'image remplace le rendu 3D dans les vignettes de la
+  colonne, les listes de sélection et le grand plan de l'écran MODIFIER L'ARME. Les images sont
+  téléchargées une fois puis mises en cache dans `data/scp_armory/cache/`.
+- **Panneau de configuration en jeu** (`scp_armory_config`, superadmin — aussi accessible via le
+  bouton CONFIGURATION en haut à droite du menu) : toutes les options générales (armoire obligatoire,
+  blocage ARC9, accréditation par défaut, vitesses, armure max, modèle de l'armoire…) et **l'URL
+  imgur de chaque objet**, avec aperçu. La configuration est sauvegardée côté serveur
+  (`data/scp_armory/server_config.json`) et diffusée à tous les joueurs en direct.
 - **Fonctionnel en jeu** au clic sur **DÉPLOYER** :
   - distribution des armes et munitions (validation côté serveur) ;
   - armure appliquée selon gilet + casque ;
@@ -61,7 +71,12 @@ garrysmod/addons/scp-armory/
 
 ## Configuration
 
-Dans `lua/scp_armory/sh_config.lua` :
+**En jeu (recommandé)** : en tant que superadmin, tapez `scp_armory_config` en console (ou cliquez
+sur **CONFIGURATION** en haut à droite de l'armurerie). Le panneau règle les options ci-dessous et
+les images imgur des objets, puis sauvegarde côté serveur et synchronise tous les joueurs.
+
+**Dans les fichiers** — `lua/scp_armory/sh_config.lua` (valeurs par défaut, écrasées par la
+configuration en jeu) :
 
 | Option | Rôle |
 | --- | --- |
@@ -108,6 +123,19 @@ le serveur valide chaque accessoire (emplacement + compatibilité) puis le pose 
 - Les emplacements imbriqués (rails ajoutés par un autre accessoire) ne sont pas proposés — seul le
   premier niveau l'est, pour garder une validation serveur simple et sûre.
 - Sans ARC9 installé, tout le reste de l'addon fonctionne normalement.
+
+## Images imgur des objets
+
+Pour un rendu propre façon Ready or Not, donnez à chaque arme/objet une image **en lien direct
+imgur** (clic droit sur l'image → « Copier l'adresse de l'image », le lien doit commencer par
+`https://i.imgur.com/` et finir par `.png` ou `.jpg`, idéalement sur fond transparent) :
+
+- **en jeu** : panneau `scp_armory_config` → section *IMAGES DES OBJETS*, collez l'URL, l'aperçu
+  se charge, puis **ENREGISTRER ET DIFFUSER** ;
+- **dans le code** : champ `icon = "https://i.imgur.com/xxxx.png"` dans `sh_items.lua`.
+
+Sans image, le menu retombe sur le rendu 3D du modèle (`model`). Les images sont mises en cache
+localement (`data/scp_armory/cache/`) et ne sont téléchargées qu'une seule fois par client.
 
 ## Réserver des armes à un job (DarkRP)
 

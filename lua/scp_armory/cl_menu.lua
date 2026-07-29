@@ -185,7 +185,7 @@ local function OpenMenu()
 	end
 	frame.PaintOver = function(_, w, h)
 		draw.SimpleText("SCP ARMORY — SITE-19", "SCPArmory_RoN_Small", w - 26, 18, COL.dim, TEXT_ALIGN_RIGHT)
-		draw.SimpleText("ACCRÉDITATION NIVEAU " .. clearance .. "  //  " .. string.upper(jobName),
+		draw.SimpleText("ACCRÉDITATION NIVEAU " .. clearance .. "  //  " .. SCPArmory.FrUpper(jobName),
 			"SCPArmory_RoN_Small", w - 26, 34, COL.faint, TEXT_ALIGN_RIGHT)
 	end
 
@@ -230,21 +230,75 @@ local function OpenMenu()
 		end
 	end
 
+	-- Grand plan via image imgur quand l'objet en a une (sinon rendu 3D)
+	local imagePanel = vgui.Create("DPanel", frame)
+	imagePanel:SetPos(math.floor(ScrW() * 0.28), 0)
+	imagePanel:SetSize(math.ceil(ScrW() * 0.72), ScrH())
+	imagePanel:SetMouseInputEnabled(false)
+	imagePanel:SetVisible(false)
+	imagePanel.Paint = function(s, w, h)
+		if s.URL then
+			SCPArmory.DrawWebIcon(s.URL, w * 0.08, h * 0.16, w * 0.76, h * 0.56)
+		end
+	end
+
+	local function ShowImage(url)
+		imagePanel.URL = url
+		imagePanel:SetVisible(true)
+		preview:SetVisible(false)
+	end
+
+	local function ShowPreview()
+		imagePanel:SetVisible(false)
+		preview:SetVisible(true)
+	end
+
 	local function RefreshPreview()
 		if mode == "modify" or mode == "attselect" then
 			local item = CurWeaponItem()
+			if item and item.icon then
+				ShowImage(item.icon)
+				return
+			end
+			ShowPreview()
 			if HasModel(item) then
 				SetPreview(item.model, true)
 				return
 			end
-		elseif mode == "select" and HasModel(hoverItem) then
-			SetPreview(hoverItem.model, true)
-			return
+		elseif mode == "select" and hoverItem then
+			if hoverItem.icon then
+				ShowImage(hoverItem.icon)
+				return
+			end
+			if HasModel(hoverItem) then
+				ShowPreview()
+				SetPreview(hoverItem.model, true)
+				return
+			end
 		end
+		ShowPreview()
 		SetPreview(plyModel, false)
 	end
 
 	SetPreview(plyModel, false)
+
+	-- Accès au panneau de configuration (superadmin) — créé après l'aperçu
+	-- pour rester cliquable et visible au-dessus
+	if LocalPlayer():IsSuperAdmin() then
+		local cfgBtn = vgui.Create("DButton", frame)
+		cfgBtn:SetPos(ScrW() - 176, 52)
+		cfgBtn:SetSize(150, 26)
+		cfgBtn:SetText("")
+		cfgBtn.Paint = function(s, w, h)
+			surface.SetDrawColor(s:IsHovered() and COL.text or COL.line)
+			surface.DrawOutlinedRect(0, 0, w, h, 1)
+			draw.SimpleText("CONFIGURATION", "SCPArmory_RoN_Label", w / 2, h / 2,
+				s:IsHovered() and COL.text or COL.dim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		end
+		cfgBtn.DoClick = function()
+			if SCPArmory.OpenConfigMenu then SCPArmory.OpenConfigMenu() end
+		end
+	end
 
 	-- --------------------------------------------------- colonne de gauche
 
@@ -263,10 +317,10 @@ local function OpenMenu()
 			surface.SetDrawColor(COL.red)
 			surface.DrawRect(0, 62, 20, 3)
 			DrawSpacedText("PRÉPARATION AU DÉPLOIEMENT", "SCPArmory_RoN_Label", 28, 58, COL.red, 2)
-			draw.SimpleText(string.upper(jobName) .. " — " .. LocalPlayer():Nick(), "SCPArmory_RoN_NameSm", 0, 82, COL.text)
+			draw.SimpleText(SCPArmory.FrUpper(jobName) .. " — " .. LocalPlayer():Nick(), "SCPArmory_RoN_NameSm", 0, 82, COL.text)
 		elseif mode == "modify" or mode == "attselect" then
 			local item = CurWeaponItem()
-			DrawSpacedText(string.upper(item and item.name or "— AUCUNE —"), "SCPArmory_RoN_Big", 0, 8, COL.text, 3)
+			DrawSpacedText(SCPArmory.FrUpper(item and item.name or "— AUCUNE —"), "SCPArmory_RoN_Big", 0, 8, COL.text, 3)
 			surface.SetDrawColor(COL.red)
 			surface.DrawRect(0, 52, 20, 3)
 			DrawSpacedText(mode == "modify" and "MODIFIER L'ARME" or "CHOIX D'ACCESSOIRE",
@@ -329,7 +383,7 @@ local function OpenMenu()
 		end
 
 		draw.SimpleText(SlotByKey(curWeaponKey).label, "SCPArmory_RoN_Label", 16, 14, COL.red)
-		DrawSpacedText(string.upper(item.name), "SCPArmory_RoN_Name", 16, 30, COL.text, 1)
+		DrawSpacedText(SCPArmory.FrUpper(item.name), "SCPArmory_RoN_Name", 16, 30, COL.text, 1)
 
 		DrawSpacedText("ACCESSOIRES", "SCPArmory_RoN_Label", 16, 148, COL.dim, 2)
 		surface.SetDrawColor(COL.line)
@@ -343,7 +397,7 @@ local function OpenMenu()
 			end
 			for _, slot in ipairs(slots) do
 				local installed = attSel[curWeaponKey][slot.index]
-				local name = installed and string.upper(SCPArmory.ARC9Bridge.AttName(installed)) or "—"
+				local name = installed and SCPArmory.FrUpper(SCPArmory.ARC9Bridge.AttName(installed)) or "—"
 				draw.SimpleText(name, "SCPArmory_RoN_Small", 16, y, installed and COL.text or COL.faint)
 				draw.SimpleText(slot.name, "SCPArmory_RoN_Small", w - 16, y, COL.red, TEXT_ALIGN_RIGHT)
 				surface.SetDrawColor(COL.lineF)
@@ -375,7 +429,7 @@ local function OpenMenu()
 		if mode == "select" then
 			local item = hoverItem
 			if item then
-				draw.SimpleText(string.upper(item.name), "SCPArmory_RoN_Label", 0, 8, COL.text)
+				draw.SimpleText(SCPArmory.FrUpper(item.name), "SCPArmory_RoN_Label", 0, 8, COL.text)
 				if IsLocked(item, clearance) then
 					draw.SimpleText("ACCRÉDITATION NIVEAU " .. item.clearance .. " REQUISE", "SCPArmory_RoN_Label",
 						w - 10, 8, COL.red, TEXT_ALIGN_RIGHT)
@@ -464,6 +518,9 @@ local function OpenMenu()
 
 		SaveSelection(selection, autoChk:GetChecked(), attSel)
 		surface.PlaySound("items/ammo_pickup.wav")
+
+		-- Déployer referme l'armurerie
+		frame:Remove()
 	end
 
 	local RebuildColumn
@@ -539,7 +596,7 @@ local function OpenMenu()
 		btn:SetTall(tall)
 		btn:SetText("")
 
-		if withImage and HasModel(item) then
+		if withImage and item and not item.icon and HasModel(item) then
 			local icon = vgui.Create("DModelPanel", btn)
 			icon:SetPos(0, 4)
 			icon:SetSize(170, 46)
@@ -551,13 +608,17 @@ local function OpenMenu()
 		btn.Paint = function(s, w, h)
 			local hov = s:IsHovered()
 
+			if withImage and item and item.icon then
+				SCPArmory.DrawWebIcon(item.icon, 0, 3, 170, 46)
+			end
+
 			if withImage then
 				draw.SimpleText(slot.label, "SCPArmory_RoN_Label", 0, 52, COL.dim)
-				DrawSpacedText(string.upper(item and item.name or "— AUCUN —"), "SCPArmory_RoN_Name", 0, 66,
+				DrawSpacedText(SCPArmory.FrUpper(item and item.name or "— AUCUN —"), "SCPArmory_RoN_Name", 0, 66,
 					hov and COL.text or COL.soft, 1)
 			else
 				draw.SimpleText(slot.label, "SCPArmory_RoN_Label", 0, 6, COL.dim)
-				DrawSpacedText(string.upper(item and item.name or "— AUCUN —"), "SCPArmory_RoN_NameSm", 0, 22,
+				DrawSpacedText(SCPArmory.FrUpper(item and item.name or "— AUCUN —"), "SCPArmory_RoN_NameSm", 0, 22,
 					hov and COL.text or COL.soft, 1)
 			end
 
@@ -597,7 +658,7 @@ local function OpenMenu()
 		btn:SetTall(58)
 		btn:SetText("")
 
-		if HasModel(item) then
+		if not item.icon and HasModel(item) then
 			local icon = vgui.Create("DModelPanel", btn)
 			icon:SetPos(6, 9)
 			icon:SetSize(96, 40)
@@ -611,6 +672,10 @@ local function OpenMenu()
 			local hov = s:IsHovered()
 			local nameCol = locked and COL.faint or (equipped or hov) and COL.text or COL.soft
 
+			if item.icon then
+				SCPArmory.DrawWebIcon(item.icon, 6, 9, 96, 40)
+			end
+
 			if equipped then
 				surface.SetDrawColor(COL.red)
 				surface.DrawRect(-8, 0, 2, h)
@@ -620,7 +685,7 @@ local function OpenMenu()
 				surface.DrawRect(0, 0, w, h)
 			end
 
-			DrawSpacedText(string.upper(item.name), "SCPArmory_RoN_NameSm", 112, 10, nameCol, 1)
+			DrawSpacedText(SCPArmory.FrUpper(item.name), "SCPArmory_RoN_NameSm", 112, 10, nameCol, 1)
 
 			draw.SimpleText(string.format("%.1f KG", item.weight or 0), "SCPArmory_RoN_Small", 112, 32, COL.faint)
 			if (item.clearance or 1) > 1 then
@@ -726,7 +791,7 @@ local function OpenMenu()
 			surface.DrawRect(-8, 0, 2, h)
 			draw.SimpleText(slotDef.label .. "  —  CHANGER D'ARME", "SCPArmory_RoN_Label", 0, 8,
 				s:IsHovered() and COL.soft or COL.dim)
-			DrawSpacedText(string.upper(item and item.name or "— AUCUNE —"), "SCPArmory_RoN_Name", 0, 26,
+			DrawSpacedText(SCPArmory.FrUpper(item and item.name or "— AUCUNE —"), "SCPArmory_RoN_Name", 0, 26,
 				s:IsHovered() and COL.text or COL.soft, 1)
 			surface.SetDrawColor(COL.lineF)
 			surface.DrawRect(0, h - 1, w, 1)
@@ -765,7 +830,7 @@ local function OpenMenu()
 			btn.Paint = function(s, w, h)
 				local hov = s:IsHovered()
 				local installed = attSel[curWeaponKey][aslot.index]
-				local name = installed and string.upper(SCPArmory.ARC9Bridge.AttName(installed)) or "—  VIDE  —"
+				local name = installed and SCPArmory.FrUpper(SCPArmory.ARC9Bridge.AttName(installed)) or "—  VIDE  —"
 
 				draw.SimpleText(aslot.name, "SCPArmory_RoN_Label", 0, 6, COL.dim)
 				DrawSpacedText(name, "SCPArmory_RoN_NameSm", 0, 24,

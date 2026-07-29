@@ -40,7 +40,7 @@ function Bridge.GetSlots(class)
 					if #cats > 0 then
 						table.insert(out, {
 							index = i,
-							name = string.upper(tostring(slot.PrintName or ("EMPLACEMENT " .. i))),
+							name = SCPArmory.FrUpper(tostring(slot.PrintName or ("EMPLACEMENT " .. i))),
 							cats = cats,
 						})
 					end
@@ -82,8 +82,8 @@ function Bridge.GetCompatible(cats)
 				if wanted[string.lower(tostring(ac))] then
 					table.insert(out, {
 						id = id,
-						name = string.upper(tostring(att.CompactName or att.PrintName or id)),
-						cat = string.upper(tostring(ToTable(att.Category)[1] or "")),
+						name = SCPArmory.FrUpper(tostring(att.CompactName or att.PrintName or id)),
+						cat = SCPArmory.FrUpper(tostring(ToTable(att.Category)[1] or "")),
 						desc = att.Description,
 					})
 					break

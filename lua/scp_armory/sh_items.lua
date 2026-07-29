@@ -8,6 +8,9 @@
 --   clearance : niveau d'accréditation requis (1-4)
 --   class     : classe d'arme à donner (optionnel — armes uniquement)
 --   model     : modèle pour l'icône du menu (optionnel)
+--   icon      : URL d'image directe imgur (https://i.imgur.com/xxxx.png) —
+--               remplace le rendu 3D dans le menu ; configurable en jeu via
+--               le panneau superadmin (scp_armory_config)
 --   ammo      : { { type = "SMG1", amount = 90 }, ... } (optionnel)
 --   armor     : points d'armure apportés (optionnel)
 --   resist    : résistance aux dégâts, 0-1 (optionnel — objets anormaux)

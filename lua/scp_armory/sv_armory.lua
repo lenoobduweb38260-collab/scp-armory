@@ -2,6 +2,9 @@
 
 util.AddNetworkString("SCPArmory_Apply")
 util.AddNetworkString("SCPArmory_Open")
+util.AddNetworkString("SCPArmory_Config")
+util.AddNetworkString("SCPArmory_SaveConfig")
+util.AddNetworkString("SCPArmory_RequestConfig")
 
 local cvarAutoApply = CreateConVar("scp_armory_autoapply", "1", FCVAR_ARCHIVE,
 	"Réapplique automatiquement le dernier loadout au respawn (si le joueur l'a demandé).")
@@ -215,3 +218,100 @@ hook.Add("PlayerDisconnected", "SCPArmory_Cleanup", function(ply)
 	SCPArmory.Stored[sid] = nil
 	SCPArmory.AutoFlag[sid] = nil
 end)
+
+-- ------------------------------------------------------------------------
+-- Configuration en jeu : persistance serveur + diffusion aux clients
+-- ------------------------------------------------------------------------
+
+local CONFIG_FILE = "scp_armory/server_config.json"
+
+-- Options modifiables depuis le panneau de configuration (avec leur type)
+local EDITABLE = {
+	RequireEntity      = "boolean",
+	BlockARC9Customize = "boolean",
+	DefaultClearance   = "number",
+	UseDistance        = "number",
+	BaseWalkSpeed      = "number",
+	BaseRunSpeed       = "number",
+	MaxArmor           = "number",
+	LockerModel        = "string",
+}
+
+SCPArmory.ItemIcons = SCPArmory.ItemIcons or {} -- "pool/id" -> URL imgur
+
+local function ApplyOverrides(data)
+	if istable(data.config) then
+		for k, expected in pairs(EDITABLE) do
+			local v = data.config[k]
+			if type(v) == expected then
+				if expected == "number" then v = math.Clamp(v, 0, 100000) end
+				SCPArmory.Config[k] = v
+			end
+		end
+		SCPArmory.Config.DefaultClearance = math.Clamp(math.Round(SCPArmory.Config.DefaultClearance), 1, 4)
+	end
+
+	if istable(data.icons) then
+		for key, url in pairs(data.icons) do
+			if isstring(key) and isstring(url) and #url < 300 then
+				local pool, id = string.match(key, "^([%w_]+)/([%w_]+)$")
+				local item = pool and SCPArmory.GetItem(pool, id)
+				if item then
+					if url == "" then
+						SCPArmory.ItemIcons[key] = nil
+						item.icon = nil
+					elseif string.find(url, "^https?://") then
+						SCPArmory.ItemIcons[key] = url
+						item.icon = url
+					end
+				end
+			end
+		end
+	end
+end
+
+local function CurrentConfigPayload()
+	local cfg = {}
+	for k in pairs(EDITABLE) do cfg[k] = SCPArmory.Config[k] end
+	return { config = cfg, icons = SCPArmory.ItemIcons }
+end
+
+local function SaveConfigToDisk()
+	file.CreateDir("scp_armory")
+	file.Write(CONFIG_FILE, util.TableToJSON(CurrentConfigPayload(), true))
+end
+
+local function LoadConfigFromDisk()
+	if not file.Exists(CONFIG_FILE, "DATA") then return end
+	local data = util.JSONToTable(file.Read(CONFIG_FILE, "DATA") or "")
+	if istable(data) then ApplyOverrides(data) end
+end
+
+local function SendConfig(target)
+	local comp = util.Compress(util.TableToJSON(CurrentConfigPayload()))
+	if not comp or #comp > 60000 then return end
+	net.Start("SCPArmory_Config")
+	net.WriteUInt(#comp, 16)
+	net.WriteData(comp, #comp)
+	if target then net.Send(target) else net.Broadcast() end
+end
+
+net.Receive("SCPArmory_RequestConfig", function(_, ply)
+	SendConfig(ply)
+end)
+
+net.Receive("SCPArmory_SaveConfig", function(_, ply)
+	if not IsValid(ply) or not ply:IsSuperAdmin() then return end
+
+	local len = net.ReadUInt(16)
+	local json = util.Decompress(net.ReadData(len) or "") or ""
+	local data = util.JSONToTable(json)
+	if not istable(data) then return end
+
+	ApplyOverrides(data)
+	SaveConfigToDisk()
+	SendConfig()
+	Notify(ply, "Configuration enregistrée et diffusée à tous les joueurs.")
+end)
+
+LoadConfigFromDisk()

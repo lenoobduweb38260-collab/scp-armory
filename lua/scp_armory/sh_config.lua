@@ -52,6 +52,24 @@ SCPArmory.Config = {
 	},
 }
 
+-- Majuscules compatibles avec les accents français (string.upper les ignore)
+local ACCENTS = {
+	["é"] = "É", ["è"] = "È", ["ê"] = "Ê", ["ë"] = "Ë",
+	["à"] = "À", ["â"] = "Â", ["ä"] = "Ä",
+	["î"] = "Î", ["ï"] = "Ï",
+	["ô"] = "Ô", ["ö"] = "Ö",
+	["ù"] = "Ù", ["û"] = "Û", ["ü"] = "Ü",
+	["ç"] = "Ç", ["œ"] = "Œ",
+}
+
+function SCPArmory.FrUpper(s)
+	s = string.upper(tostring(s or ""))
+	for l, u in pairs(ACCENTS) do
+		s = string.gsub(s, l, u)
+	end
+	return s
+end
+
 -- Accréditation effective d'un joueur (fonction partagée : utilisée par le menu et le serveur)
 function SCPArmory.GetClearance(ply)
 	if not IsValid(ply) then return 1 end
