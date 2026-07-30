@@ -230,6 +230,7 @@ local EDITABLE = {
 	BlockARC9Customize = "boolean",
 	AutoLoadWeapons    = "boolean",
 	UseDistance        = "number",
+	PreviewDistance    = "number",
 	BaseWalkSpeed      = "number",
 	BaseRunSpeed       = "number",
 	MaxArmor           = "number",

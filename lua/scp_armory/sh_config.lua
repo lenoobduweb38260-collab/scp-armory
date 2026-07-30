@@ -43,6 +43,9 @@ SCPArmory.Config = {
 	-- ne se choisissent que via l'armurerie
 	BlockARC9Customize = true,
 
+	-- Distance de la caméra sur l'opérateur dans le menu (plus grand = plus loin)
+	PreviewDistance = 120,
+
 	-- Charge automatiquement les armes des packs installés (ARC9, M9K…)
 	-- dans les pools principale/secondaire selon leur emplacement d'arme
 	AutoLoadWeapons = true,

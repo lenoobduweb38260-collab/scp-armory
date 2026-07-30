@@ -230,9 +230,10 @@ local function OpenMenu()
 			preview:SetCamPos(center + Vector(-size * 0.55, size * 1.5, size * 0.45))
 			preview:SetLookAt(center)
 		else
-			preview:SetFOV(28)
-			preview:SetCamPos(Vector(58, 0, 60))
-			preview:SetLookAt(Vector(0, 0, 50))
+			local dist = SCPArmory.Config.PreviewDistance or 120
+			preview:SetFOV(30)
+			preview:SetCamPos(Vector(dist, 0, 55))
+			preview:SetLookAt(Vector(0, 0, 42))
 			local seq = ent:LookupSequence("idle_all_01")
 			if seq and seq > 0 then ent:ResetSequence(seq) end
 		end
