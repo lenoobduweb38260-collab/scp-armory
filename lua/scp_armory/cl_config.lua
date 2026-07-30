@@ -1,6 +1,8 @@
 -- SCP Armory — synchronisation de la configuration + panneau de configuration en jeu
--- Le panneau (superadmin) règle toutes les options du menu, l'image imgur et
--- les jobs autorisés de chaque objet de l'armurerie.
+-- Panneau superadmin entièrement stylé dans le thème du menu : sliders, cases,
+-- champs texte et listes déroulantes custom. Les jobs autorisés de chaque objet
+-- se choisissent dans une liste déroulante multi-sélection alimentée par les
+-- métiers réels du serveur.
 
 SCPArmory = SCPArmory or {}
 SCPArmory.ItemIcons = SCPArmory.ItemIcons or {}
@@ -64,7 +66,9 @@ surface.CreateFont("SCPArmory_Cfg_Small", { font = "Roboto", size = 12, weight =
 local COL = {
 	bg    = Color(8, 8, 10, 252),
 	panel = Color(16, 16, 19, 255),
+	field = Color(20, 20, 24, 255),
 	text  = Color(235, 235, 235, 255),
+	soft  = Color(205, 205, 208, 255),
 	dim   = Color(125, 125, 130, 255),
 	faint = Color(75, 75, 80, 255),
 	red   = Color(190, 34, 28, 255),
@@ -80,6 +84,20 @@ local POOL_LABELS = {
 	{ pool = "armor",     label = "GILETS" },
 	{ pool = "helmet",    label = "CASQUES" },
 }
+
+-- Métiers réels du serveur (DarkRP crée une team par job)
+local function GetAllJobNames()
+	local names, seen = {}, {}
+	for _, t in pairs(team.GetAllTeams()) do
+		local nm = tostring(t.Name or "")
+		if nm ~= "" and nm ~= "Unassigned" and nm ~= "Joining/Connecting" and not seen[nm] then
+			seen[nm] = true
+			table.insert(names, nm)
+		end
+	end
+	table.sort(names)
+	return names
+end
 
 local activeConfig = nil
 
@@ -102,6 +120,8 @@ function SCPArmory.OpenConfigMenu()
 	frame:ShowCloseButton(false)
 	frame:SetDraggable(true)
 	frame:MakePopup()
+	frame:SetAlpha(0)
+	frame:AlphaTo(255, 0.15, 0)
 	frame.Paint = function(_, w, h)
 		draw.RoundedBox(4, 0, 0, w, h, COL.bg)
 		surface.SetDrawColor(COL.red)
@@ -131,6 +151,8 @@ function SCPArmory.OpenConfigMenu()
 	vbar.btnDown.Paint = function() end
 	vbar.btnGrip.Paint = function(_, w, h) draw.RoundedBox(2, 0, 0, w, h, COL.faint) end
 
+	-- ------------------------------------------- petits widgets stylés RoN
+
 	local function Section(label)
 		local pnl = scroll:Add("DPanel")
 		pnl:Dock(TOP)
@@ -153,45 +175,219 @@ function SCPArmory.OpenConfigMenu()
 		end
 	end
 
-	-- ------------------------------------------------------------- général
+	-- Champ texte sombre (le DTextEntry par défaut jure avec le thème)
+	local function StyleEntry(entry, placeholder)
+		entry:SetFont("SCPArmory_Cfg_Small")
+		entry:SetTextColor(COL.text)
+		entry:SetCursorColor(COL.text)
+		entry:SetHighlightColor(Color(190, 34, 28, 120))
+		entry:SetPaintBackground(false)
+		entry.PlaceholderTxt = placeholder
+		entry.Paint = function(s, w, h)
+			surface.SetDrawColor(COL.field)
+			surface.DrawRect(0, 0, w, h)
+			surface.SetDrawColor(s:IsEditing() and COL.red or COL.line)
+			surface.DrawOutlinedRect(0, 0, w, h, 1)
+			if s:GetText() == "" and not s:IsEditing() and s.PlaceholderTxt then
+				draw.SimpleText(s.PlaceholderTxt, "SCPArmory_Cfg_Small", 5, h / 2, COL.faint,
+					TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			end
+			s:DrawTextEntryText(COL.text, COL.red, COL.text)
+		end
+	end
 
 	local checks, nums = {}, {}
 	local lockerEntry
 
 	local function AddCheck(key, label)
-		local pnl = scroll:Add("DPanel")
-		pnl:Dock(TOP)
-		pnl:DockMargin(0, 4, 12, 0)
-		pnl:SetTall(24)
-		pnl.Paint = nil
-
-		local chk = vgui.Create("DCheckBoxLabel", pnl)
-		chk:Dock(FILL)
-		chk:SetText(label)
-		chk:SetFont("SCPArmory_Cfg_Small")
-		chk:SetTextColor(COL.text)
-		chk:SetValue(SCPArmory.Config[key] and true or false)
-		checks[key] = chk
+		local btn = scroll:Add("DButton")
+		btn:Dock(TOP)
+		btn:DockMargin(0, 6, 12, 0)
+		btn:SetTall(20)
+		btn:SetText("")
+		btn.checked = SCPArmory.Config[key] and true or false
+		btn.GetChecked = function(s) return s.checked end
+		btn.Paint = function(s, _, h)
+			local hov = s:IsHovered()
+			surface.SetDrawColor(hov and COL.text or COL.line)
+			surface.DrawOutlinedRect(0, 3, 14, 14, 1)
+			if s.checked then
+				surface.SetDrawColor(COL.red)
+				surface.DrawRect(3, 6, 8, 8)
+			end
+			draw.SimpleText(label, "SCPArmory_Cfg_Small", 22, h / 2,
+				hov and COL.text or COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		end
+		btn.DoClick = function(s)
+			s.checked = not s.checked
+			surface.PlaySound("ui/buttonclick.wav")
+		end
+		checks[key] = btn
 	end
 
+	-- Slider fin façon RoN : étiquette, valeur rouge à droite, piste cliquable
 	local function AddNumber(key, label, minV, maxV)
 		local pnl = scroll:Add("DPanel")
 		pnl:Dock(TOP)
-		pnl:DockMargin(0, 2, 12, 0)
-		pnl:SetTall(34)
-		pnl.Paint = nil
+		pnl:DockMargin(0, 6, 12, 0)
+		pnl:SetTall(36)
+		pnl:SetMouseInputEnabled(true)
+		pnl.value = math.Clamp(tonumber(SCPArmory.Config[key]) or minV, minV, maxV)
+		pnl.GetValue = function(s) return s.value end
 
-		local slider = vgui.Create("DNumSlider", pnl)
-		slider:Dock(FILL)
-		slider:SetText(label)
-		slider:SetMin(minV)
-		slider:SetMax(maxV)
-		slider:SetDecimals(0)
-		slider:SetValue(SCPArmory.Config[key] or minV)
-		slider.Label:SetTextColor(COL.text)
-		slider.Label:SetFont("SCPArmory_Cfg_Small")
-		nums[key] = slider
+		local function setFromX(s, x)
+			local w = s:GetWide()
+			if w <= 0 then return end
+			s.value = math.Round(minV + math.Clamp(x / w, 0, 1) * (maxV - minV))
+		end
+
+		pnl.Paint = function(s, w, h)
+			draw.SimpleText(label, "SCPArmory_Cfg_Small", 0, 2, COL.soft)
+			draw.SimpleText(math.Round(s.value), "SCPArmory_Cfg_Label", w, 0, COL.red, TEXT_ALIGN_RIGHT)
+
+			local ty = 25
+			surface.SetDrawColor(COL.line)
+			surface.DrawRect(0, ty, w, 2)
+			local frac = (s.value - minV) / (maxV - minV)
+			surface.SetDrawColor(COL.red)
+			surface.DrawRect(0, ty, frac * w, 2)
+			draw.RoundedBox(2, math.Clamp(frac * w - 4, 0, w - 8), ty - 5, 8, 12,
+				s.dragging and COL.redHi or COL.text)
+		end
+		pnl.OnMousePressed = function(s, mc)
+			if mc ~= MOUSE_LEFT then return end
+			s.dragging = true
+			s:MouseCapture(true)
+			setFromX(s, select(1, s:CursorPos()))
+		end
+		pnl.OnMouseReleased = function(s)
+			s.dragging = false
+			s:MouseCapture(false)
+		end
+		pnl.OnCursorMoved = function(s, x)
+			if s.dragging then setFromX(s, x) end
+		end
+
+		nums[key] = pnl
 	end
+
+	-- ------------------------- liste déroulante multi-sélection des jobs
+
+	local openPopup = nil
+
+	local function ClosePopup()
+		if IsValid(openPopup) then openPopup:Remove() end
+		if IsValid(frame.PopupCatcher) then frame.PopupCatcher:Remove() end
+		openPopup = nil
+	end
+
+	frame.OnRemove = ClosePopup
+
+	local function JobSummary(set)
+		local names = {}
+		for nm in pairs(set) do table.insert(names, nm) end
+		table.sort(names)
+		if #names == 0 then return "TOUS LES JOBS" end
+		if #names <= 2 then return SCPArmory.FrUpper(table.concat(names, ", ")) end
+		return #names .. " JOBS AUTORISÉS"
+	end
+
+	local function OpenJobDropdown(btn, set)
+		ClosePopup()
+
+		-- Clic hors de la liste = fermeture
+		local catcher = vgui.Create("DButton", frame)
+		frame.PopupCatcher = catcher
+		catcher:SetPos(0, 0)
+		catcher:SetSize(W, H)
+		catcher:SetText("")
+		catcher.Paint = function() end
+		catcher.DoClick = ClosePopup
+
+		-- Jobs du serveur + jobs déjà configurés mais absents de la map
+		local names = GetAllJobNames()
+		local seen = {}
+		for _, nm in ipairs(names) do seen[nm] = true end
+		for nm in pairs(set) do
+			if not seen[nm] then table.insert(names, nm) end
+		end
+
+		local jobColors = {}
+		for id, t in pairs(team.GetAllTeams()) do
+			if isstring(t.Name) then jobColors[t.Name] = team.GetColor(id) end
+		end
+
+		local rowH = 24
+		local listH = math.min(#names * rowH, 10 * rowH)
+		local popW = 340
+		local popH = listH + 30
+
+		local bx, by = btn:LocalToScreen(0, btn:GetTall())
+		local fx, fy = frame:LocalToScreen(0, 0)
+		local px = math.Clamp(bx - fx, 8, W - popW - 8)
+		local py = by - fy + 2
+		if py + popH > H - 8 then
+			py = (by - fy) - btn:GetTall() - popH - 2
+		end
+
+		local pop = vgui.Create("DPanel", frame)
+		openPopup = pop
+		pop:SetPos(px, py)
+		pop:SetSize(popW, popH)
+		pop:MoveToFront()
+		pop.Paint = function(_, w, h)
+			surface.SetDrawColor(12, 12, 15, 252)
+			surface.DrawRect(0, 0, w, h)
+			surface.SetDrawColor(COL.red)
+			surface.DrawRect(0, 0, w, 2)
+			surface.SetDrawColor(COL.line)
+			surface.DrawOutlinedRect(0, 0, w, h, 1)
+			draw.SimpleText("JOBS AUTORISÉS — AUCUN COCHÉ = TOUS", "SCPArmory_Cfg_Small", 8, 8, COL.dim)
+		end
+
+		local list = vgui.Create("DScrollPanel", pop)
+		list:SetPos(1, 26)
+		list:SetSize(popW - 2, popH - 27)
+
+		local lbar = list:GetVBar()
+		lbar:SetWide(4)
+		lbar.Paint = function() end
+		lbar.btnUp.Paint = function() end
+		lbar.btnDown.Paint = function() end
+		lbar.btnGrip.Paint = function(_, w, h) draw.RoundedBox(2, 0, 0, w, h, COL.faint) end
+
+		for _, nm in ipairs(names) do
+			local row = list:Add("DButton")
+			row:Dock(TOP)
+			row:SetTall(rowH)
+			row:SetText("")
+			row.Paint = function(s, w, h)
+				if s:IsHovered() then
+					surface.SetDrawColor(255, 255, 255, 8)
+					surface.DrawRect(0, 0, w, h)
+				end
+				surface.SetDrawColor(s:IsHovered() and COL.text or COL.line)
+				surface.DrawOutlinedRect(8, 5, 14, 14, 1)
+				if set[nm] then
+					surface.SetDrawColor(COL.red)
+					surface.DrawRect(11, 8, 8, 8)
+				end
+				local col = set[nm] and COL.text or COL.soft
+				draw.SimpleText(nm, "SCPArmory_Cfg_Small", 30, h / 2, col, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+				local teamCol = jobColors[nm]
+				if teamCol then
+					surface.SetDrawColor(teamCol.r, teamCol.g, teamCol.b, 255)
+					surface.DrawRect(w - 14, 8, 6, 8)
+				end
+			end
+			row.DoClick = function()
+				set[nm] = (not set[nm]) or nil
+				surface.PlaySound("ui/buttonclick.wav")
+			end
+		end
+	end
+
+	-- ------------------------------------------------------------- général
 
 	Section("GÉNÉRAL")
 	AddCheck("RequireEntity", "N'autoriser le menu et le déploiement qu'à proximité d'une armoire d'armurerie")
@@ -206,26 +402,26 @@ function SCPArmory.OpenConfigMenu()
 	do
 		local pnl = scroll:Add("DPanel")
 		pnl:Dock(TOP)
-		pnl:DockMargin(0, 6, 12, 0)
+		pnl:DockMargin(0, 8, 12, 0)
 		pnl:SetTall(26)
 		pnl.Paint = function(_, _, h)
-			draw.SimpleText("Modèle de l'armoire :", "SCPArmory_Cfg_Small", 0, h / 2, COL.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			draw.SimpleText("Modèle de l'armoire", "SCPArmory_Cfg_Small", 0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 		end
 
 		lockerEntry = vgui.Create("DTextEntry", pnl)
 		lockerEntry:Dock(RIGHT)
 		lockerEntry:SetWide(620)
-		lockerEntry:SetFont("SCPArmory_Cfg_Small")
 		lockerEntry:SetText(SCPArmory.Config.LockerModel or "")
+		StyleEntry(lockerEntry, "models/props_c17/FurnitureDrawer001a.mdl")
 	end
 
 	-- ----------------------------------------- objets : images + jobs
 
 	Section("OBJETS — IMAGE IMGUR ET JOBS AUTORISÉS")
 	Note("Image : lien direct i.imgur.com en .png ou .jpg (vide = rendu 3D du modèle).")
-	Note("Jobs : noms exacts des métiers séparés par des virgules (vide = tous les jobs voient l'objet).")
+	Note("Jobs : liste déroulante multi-sélection alimentée par les métiers du serveur. Aucun job coché = visible par tous.")
 
-	local iconEntries, jobEntries = {}, {}
+	local iconEntries, jobSelections = {}, {}
 
 	for _, group in ipairs(POOL_LABELS) do
 		local items = SCPArmory.Items[group.pool] or {}
@@ -245,6 +441,11 @@ function SCPArmory.OpenConfigMenu()
 
 			for _, item in ipairs(shown) do
 				local key = group.pool .. "/" .. item.id
+
+				-- Sélection actuelle des jobs pour cet objet
+				local set = {}
+				for _, nm in ipairs(SCPArmory.ItemJobs[key] or {}) do set[nm] = true end
+				jobSelections[key] = set
 
 				local row = scroll:Add("DPanel")
 				row:Dock(TOP)
@@ -271,23 +472,34 @@ function SCPArmory.OpenConfigMenu()
 				end
 
 				local iconEntry = vgui.Create("DTextEntry", row)
-				iconEntry:SetFont("SCPArmory_Cfg_Small")
-				iconEntry:SetPlaceholderText("https://i.imgur.com/XXXXXXX.png")
 				iconEntry:SetText(SCPArmory.ItemIcons[key] or "")
+				StyleEntry(iconEntry, "https://i.imgur.com/XXXXXXX.png")
 				iconEntries[key] = iconEntry
 
-				local jobEntry = vgui.Create("DTextEntry", row)
-				jobEntry:SetFont("SCPArmory_Cfg_Small")
-				jobEntry:SetPlaceholderText("Agent de sécurité, Chef des FGM (vide = tous)")
-				jobEntry:SetText(table.concat(SCPArmory.ItemJobs[key] or {}, ", "))
-				jobEntries[key] = jobEntry
+				-- Liste déroulante des jobs autorisés
+				local jobBtn = vgui.Create("DButton", row)
+				jobBtn:SetText("")
+				jobBtn.Paint = function(s, w, h)
+					surface.SetDrawColor(COL.field)
+					surface.DrawRect(0, 0, w, h)
+					surface.SetDrawColor(s:IsHovered() and COL.red or COL.line)
+					surface.DrawOutlinedRect(0, 0, w, h, 1)
+					local summary = JobSummary(set)
+					local col = next(set) and COL.text or COL.faint
+					draw.SimpleText(summary, "SCPArmory_Cfg_Small", 6, h / 2, col, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+					draw.SimpleText("▼", "SCPArmory_Cfg_Small", w - 8, h / 2, COL.dim, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+				end
+				jobBtn.DoClick = function(s)
+					surface.PlaySound("ui/buttonclick.wav")
+					OpenJobDropdown(s, set)
+				end
 
 				row.PerformLayout = function(_, w, h)
 					prev:SetPos(w - 70, 4)
 					iconEntry:SetPos(300, 4)
 					iconEntry:SetSize(w - 380, 20)
-					jobEntry:SetPos(300, 28)
-					jobEntry:SetSize(w - 380, 20)
+					jobBtn:SetPos(300, 28)
+					jobBtn:SetSize(w - 380, 20)
 				end
 			end
 		end
@@ -323,8 +535,11 @@ function SCPArmory.OpenConfigMenu()
 			end
 		end
 
-		for key, entry in pairs(jobEntries) do
-			payload.jobs[key] = string.Trim(entry:GetValue() or "")
+		for key, set in pairs(jobSelections) do
+			local list = {}
+			for nm in pairs(set) do table.insert(list, nm) end
+			table.sort(list)
+			payload.jobs[key] = list
 		end
 
 		local comp = util.Compress(util.TableToJSON(payload))
