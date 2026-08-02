@@ -203,13 +203,47 @@ local function OpenMenu()
 	preview:SetPos(math.floor(ScrW() * 0.28), 0)
 	preview:SetSize(math.ceil(ScrW() * 0.72), ScrH())
 	preview:SetAnimated(true)
-	preview:SetMouseInputEnabled(false)
+	preview:SetCursor("sizeall")
+
+	-- Rotation du modèle à la souris (clic gauche ou droit maintenu)
+	preview.OnMousePressed = function(s, mc)
+		if mc ~= MOUSE_LEFT and mc ~= MOUSE_RIGHT then return end
+		s.dragging = true
+		s.lastX, s.lastY = input.GetCursorPos()
+		s:MouseCapture(true)
+	end
+	preview.OnMouseReleased = function(s)
+		s.dragging = false
+		s:MouseCapture(false)
+	end
+	preview.Think = function(s)
+		if not s.dragging then return end
+		local x, y = input.GetCursorPos()
+		s.userYaw = (s.userYaw or 0) + (x - (s.lastX or x)) * 0.45
+		s.userPitch = math.Clamp((s.userPitch or 0) + (y - (s.lastY or y)) * 0.25, -35, 35)
+		s.lastX, s.lastY = x, y
+	end
+
 	preview.LayoutEntity = function(pnl, ent)
 		if pnl.CurIsWeapon then
-			ent:SetAngles(Angle(0, 30, 0))
+			ent:SetAngles(Angle(pnl.userPitch or 0, 30 + (pnl.userYaw or 0), 0))
 		else
 			pnl:RunAnimation()
-			ent:SetAngles(Angle(0, math.sin(RealTime() * 0.3) * 6 - 8, 0))
+			ent:SetAngles(Angle(0, math.sin(RealTime() * 0.3) * 6 - 8 + (pnl.userYaw or 0), 0))
+		end
+	end
+
+	-- Arme principale bone-mergée dans les mains de l'aperçu
+	local function ClearHeldWeapon()
+		if IsValid(preview.HeldWep) then preview.HeldWep:Remove() end
+		preview.HeldWep = nil
+	end
+
+	frame.OnRemove = ClearHeldWeapon
+
+	preview.PostDrawModel = function(s, ent)
+		if IsValid(s.HeldWep) then
+			s.HeldWep:DrawModel()
 		end
 	end
 
@@ -217,6 +251,8 @@ local function OpenMenu()
 		if preview.CurModel == mdl and preview.CurIsWeapon == isWeapon then return end
 		preview.CurModel = mdl
 		preview.CurIsWeapon = isWeapon
+		preview.userYaw, preview.userPitch = 0, 0
+		ClearHeldWeapon()
 		preview:SetModel(mdl)
 
 		local ent = preview:GetEntity()
@@ -262,6 +298,33 @@ local function OpenMenu()
 		preview:SetVisible(true)
 	end
 
+	-- Reflète l'équipement choisi sur l'aperçu de l'opérateur :
+	-- bodygroups gilet/casque + arme principale bone-mergée dans les mains
+	local function DecorateOperator()
+		local ent = preview:GetEntity()
+		if not IsValid(ent) or preview.CurIsWeapon then return end
+
+		SCPArmory.ApplyBodygroups(ent, selection)
+
+		ClearHeldWeapon()
+		local item = SCPArmory.GetItem("primary", selection.primary)
+		if not HasModel(item) then return end
+
+		local prop = ClientsideModel(item.model, RENDERGROUP_OPAQUE)
+		if not IsValid(prop) then return end
+
+		-- Sans os de main compatible, le bonemerge collerait l'arme aux pieds
+		if not prop:LookupBone("ValveBiped.Bip01_R_Hand") then
+			prop:Remove()
+			return
+		end
+
+		prop:SetParent(ent)
+		prop:AddEffects(EF_BONEMERGE)
+		prop:SetNoDraw(true)
+		preview.HeldWep = prop
+	end
+
 	local function RefreshPreview()
 		if mode == "modify" or mode == "attselect" then
 			local item = CurWeaponItem()
@@ -287,6 +350,7 @@ local function OpenMenu()
 		end
 		ShowPreview()
 		SetPreview(plyModel, false)
+		DecorateOperator()
 	end
 
 	SetPreview(plyModel, false)

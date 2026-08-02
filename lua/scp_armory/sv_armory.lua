@@ -68,6 +68,9 @@ function SCPArmory.Apply(ply, loadout)
 
 	ply:SetArmor(stats.armor)
 
+	-- Gilet/casque reflétés sur le playermodel quand il a les bodygroups
+	SCPArmory.ApplyBodygroups(ply, loadout)
+
 	local mult = stats.mobility / 100
 	ply:SetWalkSpeed(math.Round(cfg.BaseWalkSpeed * mult))
 	ply:SetRunSpeed(math.Round(cfg.BaseRunSpeed * mult))
@@ -80,9 +83,10 @@ function SCPArmory.Apply(ply, loadout)
 		end)
 	end
 
-	-- Pose des accessoires ARC9 sur les armes fraîchement données
+	-- Pose des accessoires ARC9 sur les armes fraîchement données,
+	-- avec une seconde passe de vérification (l'arme peut s'initialiser tard)
 	if loadout.atts and next(loadout.atts) ~= nil then
-		timer.Simple(0.3, function()
+		local function ApplyAtts()
 			if not IsValid(ply) or not ply:Alive() then return end
 			for wkey, attMap in pairs(loadout.atts) do
 				local id = loadout[wkey]
@@ -90,11 +94,16 @@ function SCPArmory.Apply(ply, loadout)
 				local wep = item and item.class and ply:GetWeapon(item.class) or nil
 				if IsValid(wep) then
 					for idx, attId in pairs(attMap) do
-						SCPArmory.ARC9Bridge.TryAttach(wep, idx, attId)
+						if not SCPArmory.ARC9Bridge.IsInstalled(wep, idx, attId) then
+							SCPArmory.ARC9Bridge.TryAttach(wep, idx, attId)
+						end
 					end
 				end
 			end
-		end)
+		end
+
+		timer.Simple(0.3, ApplyAtts)
+		timer.Simple(0.9, ApplyAtts)
 	end
 
 	Notify(ply, string.format("Chargement déployé — %.1f kg, mobilité %d%% (%s), armure %d.",

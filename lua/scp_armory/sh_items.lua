@@ -12,6 +12,10 @@
 --               le panneau superadmin (scp_armory_config)
 --   ammo      : { { type = "SMG1", amount = 90 }, ... } (optionnel)
 --   armor     : points d'armure apportés (optionnel)
+--   bodygroups : { ["nom_du_bodygroup"] = valeur } (optionnel — gilets/casques) :
+--               force ces bodygroups sur le playermodel quand l'objet est
+--               équipé ; sans ce champ, une heuristique active les bodygroups
+--               nommés vest/armor/gilet (gilet) ou helmet/casque/hat (casque)
 --   mobilityMod : bonus/malus direct de mobilité (optionnel)
 --   stats     : { degats, cadence, controle, precision } sur 100 (affichage)
 --   jobs      : { "Nom exact du job", ... } (optionnel) — l'objet n'existe QUE
@@ -211,6 +215,45 @@ function SCPArmory.GetWeightClass(mobility)
 	if mobility >= 90 then return "LÉGER" end
 	if mobility >= 65 then return "INTERMÉDIAIRE" end
 	return "LOURD"
+end
+
+-- Reflète le gilet et le casque équipés sur un modèle (joueur en jeu ou
+-- aperçu du menu) via ses bodygroups, quand le playermodel en possède.
+function SCPArmory.ApplyBodygroups(ent, loadout)
+	if not IsValid(ent) then return end
+	local groups = ent:GetBodyGroups()
+	if not istable(groups) then return end
+
+	local wantVest = loadout.armor ~= nil and loadout.armor ~= "none"
+	local wantHelmet = loadout.helmet ~= nil and loadout.helmet ~= "none"
+
+	-- Valeurs explicites définies sur les objets équipés (item.bodygroups)
+	local explicit = {}
+	for _, slotKey in ipairs({ "armor", "helmet" }) do
+		local item = SCPArmory.GetItem(slotKey, loadout[slotKey])
+		if item and istable(item.bodygroups) then
+			for bgName, val in pairs(item.bodygroups) do
+				explicit[string.lower(tostring(bgName))] = tonumber(val) or 0
+			end
+		end
+	end
+
+	for _, bg in ipairs(groups) do
+		local name = string.lower(tostring(bg.name or ""))
+		local count = tonumber(bg.num) or 0
+
+		if explicit[name] ~= nil then
+			ent:SetBodygroup(bg.id, math.Clamp(explicit[name], 0, math.max(count - 1, 0)))
+		elseif count > 1 then
+			if string.find(name, "vest", 1, true) or string.find(name, "armor", 1, true)
+				or string.find(name, "armour", 1, true) or string.find(name, "gilet", 1, true) then
+				ent:SetBodygroup(bg.id, wantVest and (count - 1) or 0)
+			elseif string.find(name, "helmet", 1, true) or string.find(name, "casque", 1, true)
+				or string.find(name, "headgear", 1, true) or string.find(name, "hat", 1, true) then
+				ent:SetBodygroup(bg.id, wantHelmet and (count - 1) or 0)
+			end
+		end
+	end
 end
 
 -- Statistiques agrégées d'un loadout { slotKey = itemId }

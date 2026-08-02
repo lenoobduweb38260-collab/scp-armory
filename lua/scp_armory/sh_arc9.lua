@@ -111,30 +111,58 @@ function Bridge.IsCompatible(class, slotIndex, attId)
 end
 
 if SERVER then
+	-- L'accessoire est-il posé sur cet emplacement de l'arme ?
+	function Bridge.IsInstalled(wep, slotIndex, attId)
+		if not IsValid(wep) or not istable(wep.Attachments) then return false end
+		local slot = wep.Attachments[slotIndex]
+		return istable(slot) and slot.Installed == attId
+	end
+
+	-- Rafraîchissements connus d'ARC9 après une pose directe
+	local function Refresh(wep)
+		for _, fn in ipairs({ "PostModify", "InvalidateCache", "NetworkWeapon", "SendWeapon", "SetupModel" }) do
+			if isfunction(wep[fn]) then pcall(wep[fn], wep) end
+		end
+	end
+
 	-- Installe un accessoire sur une arme ARC9 donnée au joueur.
-	-- Essaie l'API officielle (SWEP:Attach), sinon installation directe.
+	-- Essaie l'API officielle (SWEP:Attach) avec les différentes formes
+	-- d'adresses d'emplacement selon les versions, sinon installation directe.
 	function Bridge.TryAttach(wep, slotIndex, attId)
 		if not IsValid(wep) or not istable(wep.Attachments) then return end
 		if not wep.Attachments[slotIndex] then return end
 		if not Bridge.GetAtt(attId) then return end
 
 		local function installed()
-			local slot = wep.Attachments[slotIndex]
-			return istable(slot) and slot.Installed == attId
+			return Bridge.IsInstalled(wep, slotIndex, attId)
 		end
 
 		if isfunction(wep.Attach) then
+			-- Adresse numérique puis chaîne (emplacement de premier niveau)
 			pcall(wep.Attach, wep, slotIndex, attId)
 			if installed() then return end
 			pcall(wep.Attach, wep, tostring(slotIndex), attId)
 			if installed() then return end
+
+			-- Adresse issue de la liste aplatie des emplacements, si exposée
+			if isfunction(wep.GetSubSlotList) then
+				local ok, list = pcall(wep.GetSubSlotList, wep)
+				if ok and istable(list) then
+					for _, sub in pairs(list) do
+						if istable(sub) and sub.Address ~= nil
+							and (sub == wep.Attachments[slotIndex]
+								or tostring(sub.Address) == tostring(slotIndex)) then
+							pcall(wep.Attach, wep, sub.Address, attId)
+							if installed() then return end
+						end
+					end
+				end
+			end
 		end
 
-		-- Dernier recours : pose directe + rafraîchissements connus d'ARC9
+		-- Dernier recours : pose directe + rafraîchissements
 		wep.Attachments[slotIndex].Installed = attId
-		if isfunction(wep.PostModify) then pcall(wep.PostModify, wep) end
-		if isfunction(wep.NetworkWeapon) then pcall(wep.NetworkWeapon, wep) end
-		if isfunction(wep.InvalidateCache) then pcall(wep.InvalidateCache, wep) end
+		Refresh(wep)
 	end
 end
 
