@@ -105,9 +105,15 @@ liste automatiquement ses emplacements de premier niveau (`SWEP.Attachments`) et
 compatibles du registre `ARC9.Attachments`. Au déploiement, le serveur valide chaque accessoire
 (emplacement + compatibilité) puis le pose sur l'arme donnée (`SWEP:Attach`, avec repli défensif).
 
+La pose au déploiement reproduit le chemin serveur d'ARC9 (`BuildSubAttachments` sur l'arbre complet
+puis `SendWeapon`/`PostModify`) : elle est diffusée aux clients et **ne dépend ni de l'inventaire
+d'accessoires ARC9 ni d'aucune ConVar** — pas besoin de `arc9_free_atts`.
+
 - Les joueurs ne passent **jamais** par le menu ARC9 : la touche C est bloquée sur les armes ARC9
-  tant que `BlockARC9Customize = true`.
-- Recommandé côté serveur : `arc9_free_atts 1` (les accessoires sont fournis par l'armurerie).
+  tant que `BlockARC9Customize = true`. Pour verrouiller aussi côté serveur, vous pouvez en plus
+  mettre `arc9_atts_nocustomize 1` : l'armurerie continue de fonctionner.
+- L'aperçu de l'écran *MODIFIER L'ARME* affiche le viewmodel de l'arme **avec les accessoires
+  équipés posés dessus** (même calcul de placement qu'ARC9 : os de l'emplacement + offsets).
 - Les emplacements imbriqués (rails ajoutés par un autre accessoire) ne sont pas proposés — seul le
   premier niveau l'est, pour garder une validation serveur simple et sûre.
 - Sans ARC9 installé, tout le reste de l'addon fonctionne normalement.

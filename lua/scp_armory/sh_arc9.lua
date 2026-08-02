@@ -118,51 +118,48 @@ if SERVER then
 		return istable(slot) and slot.Installed == attId
 	end
 
-	-- Rafraîchissements connus d'ARC9 après une pose directe
-	local function Refresh(wep)
-		for _, fn in ipairs({ "PostModify", "InvalidateCache", "NetworkWeapon", "SendWeapon", "SetupModel" }) do
-			if isfunction(wep[fn]) then pcall(wep[fn], wep) end
-		end
-	end
+	-- Applique d'un coup tous les accessoires choisis sur une arme ARC9,
+	-- en reproduisant exactement le chemin serveur d'ARC9 quand il reçoit
+	-- un loadout client (SWEP:ReceiveWeapon) : BuildSubAttachments sur
+	-- l'arbre complet, puis Prune/FillIntegral, SendWeapon (diffusion aux
+	-- clients — c'est ce qui rend les accessoires visibles) et PostModify.
+	-- Ce chemin ne passe pas par SWEP:Attach, donc ni l'inventaire ARC9 ni
+	-- arc9_atts_nocustomize ne peuvent bloquer la pose.
+	function Bridge.ApplyTree(wep, attMap)
+		if not IsValid(wep) or not istable(wep.Attachments) then return false end
 
-	-- Installe un accessoire sur une arme ARC9 donnée au joueur.
-	-- Essaie l'API officielle (SWEP:Attach) avec les différentes formes
-	-- d'adresses d'emplacement selon les versions, sinon installation directe.
-	function Bridge.TryAttach(wep, slotIndex, attId)
-		if not IsValid(wep) or not istable(wep.Attachments) then return end
-		if not wep.Attachments[slotIndex] then return end
-		if not Bridge.GetAtt(attId) then return end
-
-		local function installed()
-			return Bridge.IsInstalled(wep, slotIndex, attId)
-		end
-
-		if isfunction(wep.Attach) then
-			-- Adresse numérique puis chaîne (emplacement de premier niveau)
-			pcall(wep.Attach, wep, slotIndex, attId)
-			if installed() then return end
-			pcall(wep.Attach, wep, tostring(slotIndex), attId)
-			if installed() then return end
-
-			-- Adresse issue de la liste aplatie des emplacements, si exposée
-			if isfunction(wep.GetSubSlotList) then
-				local ok, list = pcall(wep.GetSubSlotList, wep)
-				if ok and istable(list) then
-					for _, sub in pairs(list) do
-						if istable(sub) and sub.Address ~= nil
-							and (sub == wep.Attachments[slotIndex]
-								or tostring(sub.Address) == tostring(slotIndex)) then
-							pcall(wep.Attach, wep, sub.Address, attId)
-							if installed() then return end
-						end
-					end
+		if not isfunction(wep.BuildSubAttachments) then
+			-- Version d'ARC9 inconnue : pose directe minimale
+			for idx, attId in pairs(attMap) do
+				if istable(wep.Attachments[idx]) and Bridge.GetAtt(attId) then
+					wep.Attachments[idx].Installed = attId
 				end
 			end
+		else
+			-- Arbre complet : les emplacements non configurés gardent leur
+			-- contenu d'origine (pièces intégrales, défauts d'usine…)
+			local tree = {}
+			for i, slot in ipairs(wep.Attachments) do
+				local id = attMap[i]
+				if id and not Bridge.GetAtt(id) then id = nil end
+				tree[i] = {
+					Installed = id or (istable(slot) and slot.Installed or nil),
+					SubAttachments = {},
+				}
+			end
+
+			local ok = pcall(wep.BuildSubAttachments, wep, tree)
+			if not ok then return false end
 		end
 
-		-- Dernier recours : pose directe + rafraîchissements
-		wep.Attachments[slotIndex].Installed = attId
-		Refresh(wep)
+		-- Même chaîne de rafraîchissement que SWEP:ReceiveWeapon côté serveur
+		if isfunction(wep.DoInvalidateCache) then pcall(wep.DoInvalidateCache, wep) end
+		if isfunction(wep.PruneAttachments) then pcall(wep.PruneAttachments, wep) end
+		if isfunction(wep.FillIntegralSlots) then pcall(wep.FillIntegralSlots, wep) end
+		if isfunction(wep.SendWeapon) then pcall(wep.SendWeapon, wep) end
+		if isfunction(wep.PostModify) then pcall(wep.PostModify, wep) end
+
+		return true
 	end
 end
 

@@ -239,11 +239,57 @@ local function OpenMenu()
 		preview.HeldWep = nil
 	end
 
-	frame.OnRemove = ClearHeldWeapon
+	-- Modèles d'accessoires ARC9 posés sur l'arme de l'aperçu
+	local function ClearPreviewAtts()
+		for _, a in ipairs(preview.AttModels or {}) do
+			if IsValid(a.mdl) then a.mdl:Remove() end
+		end
+		preview.AttModels = nil
+	end
+
+	frame.OnRemove = function()
+		ClearHeldWeapon()
+		ClearPreviewAtts()
+	end
 
 	preview.PostDrawModel = function(s, ent)
 		if IsValid(s.HeldWep) then
 			s.HeldWep:DrawModel()
+		end
+
+		if not s.AttModels then return end
+
+		-- Placement des accessoires : même calcul qu'ARC9
+		-- (os de l'emplacement + Pos/Ang du slot + offsets du modèle)
+		ent:SetupBones()
+		for _, a in ipairs(s.AttModels) do
+			if IsValid(a.mdl) then
+				local boneId = ent:LookupBone(a.slot.Bone or "")
+				local m = boneId and ent:GetBoneMatrix(boneId) or nil
+				if m then
+					local bpos, bang = m:GetTranslation(), m:GetAngles()
+					local op = a.slot.Pos or vector_origin
+					local oa = a.slot.Ang or angle_zero
+
+					local apos = LocalToWorld(Vector(op[1], -op[2], op[3]), bang, bpos, bang)
+					local aang = Angle(bang)
+
+					local maoff = a.att.ModelAngleOffset
+					aang:RotateAroundAxis(aang:Forward(), oa.r + (maoff and maoff.r or 0))
+					aang:RotateAroundAxis(aang:Right(), oa.p + (maoff and maoff.p or 0))
+					aang:RotateAroundAxis(aang:Up(), oa.y + (maoff and maoff.y or 0))
+
+					if a.att.ModelOffset then
+						local mo = a.att.ModelOffset * (a.slot.Scale or 1)
+						apos = apos + aang:Forward() * mo.x + aang:Right() * mo.y + aang:Up() * mo.z
+					end
+
+					a.mdl:SetPos(apos)
+					a.mdl:SetAngles(aang)
+					a.mdl:SetupBones()
+					a.mdl:DrawModel()
+				end
+			end
 		end
 	end
 
@@ -253,6 +299,7 @@ local function OpenMenu()
 		preview.CurIsWeapon = isWeapon
 		preview.userYaw, preview.userPitch = 0, 0
 		ClearHeldWeapon()
+		ClearPreviewAtts()
 		preview:SetModel(mdl)
 
 		local ent = preview:GetEntity()
@@ -325,18 +372,68 @@ local function OpenMenu()
 		preview.HeldWep = prop
 	end
 
+	-- Pose les modèles des accessoires équipés sur l'arme de l'aperçu.
+	-- Les Pos/Ang des emplacements ARC9 sont exprimés dans le repère du
+	-- viewmodel : l'aperçu ARC9 affiche donc le viewmodel de l'arme.
+	local function BuildPreviewAtts(item)
+		ClearPreviewAtts()
+		if not (item and item.class and SCPArmory.ARC9Bridge.IsARC9Class(item.class)) then return end
+		if not (ARC9 and istable(ARC9.Attachments)) then return end
+
+		local ent = preview:GetEntity()
+		local swep = weapons.Get(item.class)
+		if not (IsValid(ent) and swep and istable(swep.Attachments)) then return end
+
+		local list = {}
+		for idx, attId in pairs(attSel[curWeaponKey] or {}) do
+			local slottbl = swep.Attachments[idx]
+			local atttbl = ARC9.Attachments[attId]
+			if istable(slottbl) and istable(atttbl) and isstring(atttbl.Model)
+				and isstring(slottbl.Bone) and ent:LookupBone(slottbl.Bone) then
+				local mdl = ClientsideModel(atttbl.Model, RENDERGROUP_OPAQUE)
+				if IsValid(mdl) then
+					mdl:SetNoDraw(true)
+					if slottbl.Scale then mdl:SetModelScale(slottbl.Scale, 0) end
+					if atttbl.ModelSkin then mdl:SetSkin(atttbl.ModelSkin) end
+					if isstring(atttbl.ModelBodygroups) then mdl:SetBodyGroups(atttbl.ModelBodygroups) end
+					table.insert(list, { mdl = mdl, slot = slottbl, att = atttbl })
+				end
+			end
+		end
+
+		if #list > 0 then preview.AttModels = list end
+	end
+
+	-- Meilleur modèle pour l'aperçu d'une arme ARC9 : son viewmodel
+	-- (les accessoires s'y posent), sinon le world model
+	local function BestWeaponModel(item)
+		if item and item.class and SCPArmory.ARC9Bridge.IsARC9Class(item.class) then
+			local swep = weapons.Get(item.class)
+			local vm = swep and swep.ViewModel
+			if isstring(vm) and vm ~= "" and file.Exists(vm, "GAME") then
+				return vm
+			end
+		end
+		return HasModel(item) and item.model or nil
+	end
+
 	local function RefreshPreview()
 		if mode == "modify" or mode == "attselect" then
 			local item = CurWeaponItem()
+			local mdl = BestWeaponModel(item)
+			if mdl then
+				-- Priorité au 3D avec accessoires posés (rotation à la souris) ;
+				-- l'image imgur ne sert que si aucun modèle n'est disponible
+				ShowPreview()
+				SetPreview(mdl, true)
+				BuildPreviewAtts(item)
+				return
+			end
 			if item and item.icon then
 				ShowImage(item.icon)
 				return
 			end
 			ShowPreview()
-			if HasModel(item) then
-				SetPreview(item.model, true)
-				return
-			end
 		elseif mode == "select" and hoverItem then
 			if hoverItem.icon then
 				ShowImage(hoverItem.icon)

@@ -93,10 +93,15 @@ function SCPArmory.Apply(ply, loadout)
 				local item = id and id ~= "none" and SCPArmory.GetItem(wkey, id) or nil
 				local wep = item and item.class and ply:GetWeapon(item.class) or nil
 				if IsValid(wep) then
+					local needsApply = false
 					for idx, attId in pairs(attMap) do
 						if not SCPArmory.ARC9Bridge.IsInstalled(wep, idx, attId) then
-							SCPArmory.ARC9Bridge.TryAttach(wep, idx, attId)
+							needsApply = true
+							break
 						end
+					end
+					if needsApply then
+						SCPArmory.ARC9Bridge.ApplyTree(wep, attMap)
 					end
 				end
 			end
