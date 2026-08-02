@@ -33,60 +33,15 @@ local NONE = function(label)
 end
 
 SCPArmory.Items = {
+	-- Les armes de base HL2/GMod sont volontairement exclues des pools
+	-- principale/secondaire : ils sont remplis par le chargement automatique
+	-- des packs installés (ARC9, M9K…) via sh_autoload.lua.
 	primary = {
 		NONE("— Sans arme principale —"),
-		{
-			id = "smg", name = "PM « Éclaireur-9 »",
-			desc = "Pistolet-mitrailleur standard des FGM. Polyvalent, contrôlable, idéal en espace confiné.",
-			weight = 3.1,
-			class = "weapon_smg1", model = "models/weapons/w_smg1.mdl",
-			ammo = { { type = "SMG1", amount = 135 }, { type = "SMG1_Grenade", amount = 1 } },
-			stats = { degats = 55, cadence = 82, controle = 74, precision = 60 },
-		},
-		{
-			id = "ar2", name = "Fusil à impulsions « Suppression »",
-			desc = "Fusil d'assaut à énergie dirigée. Puissance de feu élevée pour les brèches de confinement majeures.",
-			weight = 3.8,
-			class = "weapon_ar2", model = "models/weapons/w_irifle.mdl",
-			ammo = { { type = "AR2", amount = 90 }, { type = "AR2AltFire", amount = 1 } },
-			stats = { degats = 72, cadence = 70, controle = 58, precision = 76 },
-		},
-		{
-			id = "shotgun", name = "Fusil à pompe « Brèche »",
-			desc = "Calibre 12 de dotation. Dévastateur à courte portée, ouverture de portes récalcitrantes incluse.",
-			weight = 3.6,
-			class = "weapon_shotgun", model = "models/weapons/w_shotgun.mdl",
-			ammo = { { type = "Buckshot", amount = 32 } },
-			stats = { degats = 92, cadence = 24, controle = 44, precision = 35 },
-		},
-		{
-			id = "crossbow", name = "Arbalète thermique « Vigie »",
-			desc = "Carreaux surchauffés, silencieuse et chirurgicale. Pour neutraliser sans alerter tout le site.",
-			weight = 4.2,
-			class = "weapon_crossbow", model = "models/weapons/w_crossbow.mdl",
-			ammo = { { type = "XBowBolt", amount = 10 } },
-			stats = { degats = 95, cadence = 12, controle = 38, precision = 96 },
-		},
 	},
 
 	secondary = {
 		NONE("— Sans arme secondaire —"),
-		{
-			id = "pistol", name = "Pistolet de service 9 mm",
-			desc = "Arme de poing réglementaire de la Fondation. Fiable, légère, toujours à portée de main.",
-			weight = 0.9,
-			class = "weapon_pistol", model = "models/weapons/w_pistol.mdl",
-			ammo = { { type = "Pistol", amount = 90 } },
-			stats = { degats = 40, cadence = 58, controle = 86, precision = 58 },
-		},
-		{
-			id = "revolver", name = "Revolver .357 « Dernier Recours »",
-			desc = "Six chambres, zéro compromis. Quand la procédure de confinement a déjà échoué.",
-			weight = 1.2,
-			class = "weapon_357", model = "models/weapons/w_357.mdl",
-			ammo = { { type = "357", amount = 24 } },
-			stats = { degats = 75, cadence = 22, controle = 52, precision = 66 },
-		},
 	},
 
 	tactical = {
@@ -185,8 +140,8 @@ SCPArmory.Slots = {
 -- Loadout proposé par défaut
 function SCPArmory.DefaultLoadout()
 	return {
-		primary   = "smg",
-		secondary = "pistol",
+		primary   = "none",
+		secondary = "none",
 		tactical1 = "medkit",
 		tactical2 = "none",
 		grenade   = "frag",

@@ -133,6 +133,10 @@ localement (`data/scp_armory/cache/`) et ne sont téléchargées qu'une seule fo
 
 ## Ajouter des armes à la main
 
+Les armes de base HL2/GMod sont exclues des pools principale/secondaire : ces pools sont remplis
+par le chargement automatique de vos packs (ARC9, M9K…). Seuls l'équipement tactique et les
+grenades utilisent encore des objets HL2, pour que ces emplacements fonctionnent sans dépendance.
+
 Le chargement automatique couvre la plupart des cas. Pour une entrée sur mesure (nom français,
 stats affichées, munitions précises), ajoutez un objet dans `lua/scp_armory/sh_items.lua` :
 

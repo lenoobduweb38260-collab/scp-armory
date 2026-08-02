@@ -216,6 +216,23 @@ local function OpenMenu()
 		s.dragging = false
 		s:MouseCapture(false)
 	end
+
+	-- Caméra de l'arme : distance de base rapprochée + zoom à la molette
+	local function UpdateWeaponCam()
+		local c, size = preview.WepCenter, preview.WepSize
+		if not c then return end
+		local d = size * 1.0 * (preview.zoom or 1)
+		preview:SetFOV(32)
+		preview:SetCamPos(c + Vector(-d * 0.38, d, d * 0.27))
+		preview:SetLookAt(c)
+	end
+
+	preview.OnMouseWheeled = function(s, delta)
+		if not s.CurIsWeapon then return end
+		s.zoom = math.Clamp((s.zoom or 1) * (1 - delta * 0.12), 0.4, 2.2)
+		UpdateWeaponCam()
+		return true
+	end
 	preview.Think = function(s)
 		if not s.dragging then return end
 		local x, y = input.GetCursorPos()
@@ -307,12 +324,12 @@ local function OpenMenu()
 
 		if isWeapon then
 			local mn, mx = ent:GetRenderBounds()
-			local center = (mn + mx) * 0.5
-			local size = math.max(mx.x - mn.x, mx.y - mn.y, mx.z - mn.z, 8)
-			preview:SetFOV(30)
-			preview:SetCamPos(center + Vector(-size * 0.55, size * 1.5, size * 0.45))
-			preview:SetLookAt(center)
+			preview.WepCenter = (mn + mx) * 0.5
+			preview.WepSize = math.max(mx.x - mn.x, mx.y - mn.y, mx.z - mn.z, 8)
+			preview.zoom = 1
+			UpdateWeaponCam()
 		else
+			preview.WepCenter = nil
 			local dist = SCPArmory.Config.PreviewDistance or 120
 			preview:SetFOV(30)
 			preview:SetCamPos(Vector(dist, 0, 55))

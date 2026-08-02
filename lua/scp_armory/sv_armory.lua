@@ -93,6 +93,10 @@ function SCPArmory.Apply(ply, loadout)
 				local item = id and id ~= "none" and SCPArmory.GetItem(wkey, id) or nil
 				local wep = item and item.class and ply:GetWeapon(item.class) or nil
 				if IsValid(wep) then
+					-- Mémorisé sur l'arme : ré-appliqué quand on la sort
+					-- (les armes en holster ratent parfois l'init ARC9)
+					wep.SCPArmoryPendingAtts = attMap
+
 					local needsApply = false
 					for idx, attId in pairs(attMap) do
 						if not SCPArmory.ARC9Bridge.IsInstalled(wep, idx, attId) then
@@ -223,6 +227,24 @@ hook.Add("PlayerSay", "SCPArmory_ChatCommand", function(ply, text)
 			return ""
 		end
 	end
+end)
+
+-- Filet de sécurité : quand le joueur sort une arme dont les accessoires
+-- n'ont pas pris (arme secondaire restée en holster au déploiement),
+-- on les ré-applique à la sortie de l'arme
+hook.Add("PlayerSwitchWeapon", "SCPArmory_AttsOnSwitch", function(_, _, new)
+	if not IsValid(new) or not istable(new.SCPArmoryPendingAtts) then return end
+
+	local map = new.SCPArmoryPendingAtts
+	timer.Simple(0.15, function()
+		if not IsValid(new) then return end
+		for idx, attId in pairs(map) do
+			if not SCPArmory.ARC9Bridge.IsInstalled(new, idx, attId) then
+				SCPArmory.ARC9Bridge.ApplyTree(new, map)
+				return
+			end
+		end
+	end)
 end)
 
 -- Nettoyage à la déconnexion
