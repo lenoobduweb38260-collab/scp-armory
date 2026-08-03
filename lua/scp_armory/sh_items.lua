@@ -209,6 +209,27 @@ function SCPArmory.ApplyBodygroups(ent, loadout)
 			end
 		end
 	end
+
+	-- Les choix d'apparence du joueur passent en dernier (prioritaires)
+	if istable(loadout.bg) then
+		SCPArmory.ApplyCustomBG(ent, loadout.bg)
+	end
+end
+
+-- Applique une carte de bodygroups personnalisés { nom (minuscule) = valeur }
+-- sur un modèle, limitée aux bodygroups autorisés par la configuration.
+function SCPArmory.ApplyCustomBG(ent, map)
+	if not IsValid(ent) or not istable(map) then return end
+	local groups = ent:GetBodyGroups()
+	if not istable(groups) then return end
+
+	for _, bg in ipairs(groups) do
+		local name = string.lower(tostring(bg.name or ""))
+		local v = map[name]
+		if v ~= nil and SCPArmory.AllowedBodygroups[name] then
+			ent:SetBodygroup(bg.id, math.Clamp(math.floor(tonumber(v) or 0), 0, math.max((bg.num or 1) - 1, 0)))
+		end
+	end
 end
 
 -- Statistiques agrégées d'un loadout { slotKey = itemId }

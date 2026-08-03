@@ -48,6 +48,15 @@ net.Receive("SCPArmory_Config", function()
 		end
 	end
 
+	SCPArmory.AllowedBodygroups = {}
+	if istable(data.bgallow) then
+		for _, name in ipairs(data.bgallow) do
+			if isstring(name) then
+				SCPArmory.AllowedBodygroups[string.lower(name)] = true
+			end
+		end
+	end
+
 	SCPArmory.ApplyPendingItemConfig()
 end)
 
@@ -424,6 +433,44 @@ function SCPArmory.OpenConfigMenu()
 		StyleEntry(lockerEntry, "models/props_c17/FurnitureDrawer001a.mdl")
 	end
 
+	-- --------------------------- apparence : bodygroups autorisés aux joueurs
+
+	Section("APPARENCE — BODYGROUPS MODIFIABLES PAR LES JOUEURS")
+	Note("Liste basée sur VOTRE playermodel actuel. Les bodygroups cochés deviennent réglables par les joueurs")
+	Note("dans l'armurerie (section APPARENCE) et via !apparence. Les noms déjà autorisés sont conservés.")
+
+	local bgAllowChecks = {}
+	for _, bg in ipairs(LocalPlayer():GetBodyGroups() or {}) do
+		local nm = string.lower(tostring(bg.name or ""))
+		if (bg.num or 0) > 1 and nm ~= "" then
+			local btn = scroll:Add("DButton")
+			btn:Dock(TOP)
+			btn:DockMargin(0, 4, 12, 0)
+			btn:SetTall(20)
+			btn:SetText("")
+			btn.checked = SCPArmory.AllowedBodygroups[nm] and true or false
+			btn.Paint = function(s, _, h)
+				local hov = s:IsHovered()
+				surface.SetDrawColor(hov and COL.text or COL.line)
+				surface.DrawOutlinedRect(0, 3, 14, 14, 1)
+				if s.checked then
+					surface.SetDrawColor(COL.red)
+					surface.DrawRect(3, 6, 8, 8)
+				end
+				draw.SimpleText(nm .. "  (" .. bg.num .. " variantes)", "SCPArmory_Cfg_Small", 22, h / 2,
+					hov and COL.text or COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			end
+			btn.DoClick = function(s)
+				s.checked = not s.checked
+				surface.PlaySound("ui/buttonclick.wav")
+			end
+			bgAllowChecks[nm] = btn
+		end
+	end
+	if not next(bgAllowChecks) then
+		Note("Votre playermodel actuel n'a aucun bodygroup à variantes.")
+	end
+
 	-- ----------------------------------------- objets : images + jobs
 
 	Section("OBJETS — IMAGE IMGUR ET JOBS AUTORISÉS")
@@ -550,6 +597,17 @@ function SCPArmory.OpenConfigMenu()
 			table.sort(list)
 			payload.jobs[key] = list
 		end
+
+		-- Bodygroups autorisés : fusion avec l'existant (les noms d'autres
+		-- playermodels déjà autorisés ne sont pas perdus)
+		local bgset = {}
+		for nm in pairs(SCPArmory.AllowedBodygroups or {}) do bgset[nm] = true end
+		for nm, chk in pairs(bgAllowChecks) do
+			bgset[nm] = chk:GetChecked() and true or nil
+		end
+		payload.bgallow = {}
+		for nm in pairs(bgset) do table.insert(payload.bgallow, nm) end
+		table.sort(payload.bgallow)
 
 		local comp = util.Compress(util.TableToJSON(payload))
 		if not comp or #comp > 60000 then

@@ -7,6 +7,8 @@ util.AddNetworkString("SCPArmory_OpenConfig")
 util.AddNetworkString("SCPArmory_Config")
 util.AddNetworkString("SCPArmory_SaveConfig")
 util.AddNetworkString("SCPArmory_RequestConfig")
+util.AddNetworkString("SCPArmory_ApplyBG")
+util.AddNetworkString("SCPArmory_OpenBG")
 
 local cvarAutoApply = CreateConVar("scp_armory_autoapply", "1", FCVAR_ARCHIVE,
 	"Réapplique automatiquement le dernier loadout au respawn (si le joueur l'a demandé).")
@@ -184,6 +186,18 @@ net.Receive("SCPArmory_Apply", function(_, ply)
 	end
 	loadout.atts = atts
 
+	-- Apparence : bodygroups personnalisés (noms autorisés en config)
+	local bgCount = net.ReadUInt(5)
+	local bgMap = {}
+	for _ = 1, math.min(bgCount, 24) do
+		local name = string.lower(net.ReadString())
+		local val = net.ReadUInt(5)
+		if #name <= 48 and SCPArmory.AllowedBodygroups[name] then
+			bgMap[name] = val
+		end
+	end
+	if next(bgMap) ~= nil then loadout.bg = bgMap end
+
 	local sid = StoreKey(ply)
 	SCPArmory.Stored[sid] = loadout
 	SCPArmory.AutoFlag[sid] = autoApply
@@ -255,6 +269,38 @@ hook.Add("PlayerSay", "SCPArmory_ChatCommand", function(ply, text)
 			return ""
 		end
 	end
+
+	for _, cmd in ipairs(SCPArmory.Config.BGChatCommands or {}) do
+		if lowered == cmd then
+			net.Start("SCPArmory_OpenBG")
+			net.Send(ply)
+			return ""
+		end
+	end
+end)
+
+-- Menu d'apparence autonome : application immédiate des bodygroups choisis
+net.Receive("SCPArmory_ApplyBG", function(_, ply)
+	if not RateLimit(ply, "SCPArmoryRL_BG", 1) then return end
+
+	local count = net.ReadUInt(5)
+	local map = {}
+	for _ = 1, math.min(count, 24) do
+		local name = string.lower(net.ReadString())
+		local val = net.ReadUInt(5)
+		if #name <= 48 and SCPArmory.AllowedBodygroups[name] then
+			map[name] = val
+		end
+	end
+
+	local sid = StoreKey(ply)
+	SCPArmory.StoredBG = SCPArmory.StoredBG or {}
+	SCPArmory.StoredBG[sid] = map
+
+	-- Mémorisé aussi dans le loadout pour le respawn automatique
+	if SCPArmory.Stored[sid] then SCPArmory.Stored[sid].bg = map end
+
+	SCPArmory.ApplyCustomBG(ply, map)
 end)
 
 -- Filet de sécurité : quand le joueur sort une arme dont les accessoires
@@ -279,11 +325,21 @@ hook.Add("PlayerSwitchWeapon", "SCPArmory_AttsOnSwitch", function(_, _, new)
 	end)
 end)
 
+-- Ré-application de l'apparence après le respawn (le modèle est réinitialisé)
+hook.Add("PlayerSpawn", "SCPArmory_BGRespawn", function(ply)
+	timer.Simple(0.35, function()
+		if not IsValid(ply) or not ply:Alive() then return end
+		local map = SCPArmory.StoredBG and SCPArmory.StoredBG[StoreKey(ply)]
+		if map then SCPArmory.ApplyCustomBG(ply, map) end
+	end)
+end)
+
 -- Nettoyage à la déconnexion
 hook.Add("PlayerDisconnected", "SCPArmory_Cleanup", function(ply)
 	local sid = StoreKey(ply)
 	SCPArmory.Stored[sid] = nil
 	SCPArmory.AutoFlag[sid] = nil
+	if SCPArmory.StoredBG then SCPArmory.StoredBG[sid] = nil end
 end)
 
 -- ------------------------------------------------------------------------
@@ -389,13 +445,33 @@ local function ApplyOverrides(data)
 		end
 	end
 
+	-- Bodygroups autorisés aux joueurs (32 noms max, 48 caractères max)
+	if istable(data.bgallow) then
+		local set, n = {}, 0
+		for _, name in ipairs(data.bgallow) do
+			if isstring(name) and #name > 0 and #name <= 48 then
+				set[string.lower(name)] = true
+				n = n + 1
+				if n >= 32 then break end
+			end
+		end
+		SCPArmory.AllowedBodygroups = set
+	end
+
 	SCPArmory.ApplyPendingItemConfig()
 end
 
 local function CurrentConfigPayload()
 	local cfg = {}
 	for k in pairs(EDITABLE) do cfg[k] = SCPArmory.Config[k] end
-	return { config = cfg, icons = SCPArmory.ItemIcons, jobs = SCPArmory.ItemJobs }
+
+	local bgallow = {}
+	for name in pairs(SCPArmory.AllowedBodygroups or {}) do
+		table.insert(bgallow, name)
+	end
+	table.sort(bgallow)
+
+	return { config = cfg, icons = SCPArmory.ItemIcons, jobs = SCPArmory.ItemJobs, bgallow = bgallow }
 end
 
 local function SaveConfigToDisk()

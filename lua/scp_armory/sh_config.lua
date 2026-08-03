@@ -50,6 +50,12 @@ SCPArmory.Config = {
 	-- l'opérateur, caisse d'armes sous l'arme en personnalisation
 	MenuScene = true,
 
+	-- Séquence de pose de l'opérateur dans le menu (bras croisés si dispo)
+	PreviewPose = "pose_standing_02",
+
+	-- Commandes chat qui ouvrent le menu d'apparence (bodygroups)
+	BGChatCommands = { "!apparence", "!bodygroups" },
+
 	-- Journalisation serveur : fichiers datés dans data/scp_armory/logs/
 	LogToFile = true,
 
@@ -101,6 +107,10 @@ function SCPArmory.FrUpper(s)
 
 	return out
 end
+
+-- Bodygroups des playermodels que les joueurs ont le droit de modifier
+-- (noms en minuscules, cochés dans le panneau de configuration en jeu)
+SCPArmory.AllowedBodygroups = SCPArmory.AllowedBodygroups or {}
 
 -- Un objet réservé à certains jobs (champ item.jobs) est totalement invisible
 -- pour les autres, comme dans Ready or Not : on ne voit que son arsenal.

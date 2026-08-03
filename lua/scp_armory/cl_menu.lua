@@ -129,6 +129,16 @@ local function LoadSaved()
 					end
 				end
 			end
+
+			-- Bodygroups personnalisés (apparence)
+			if istable(tbl.bg) then
+				sel.bg = {}
+				for k, v in pairs(tbl.bg) do
+					if isstring(k) and #k <= 48 and isnumber(v) then
+						sel.bg[string.lower(k)] = math.Clamp(math.floor(v), 0, 31)
+					end
+				end
+			end
 		end
 	end
 
@@ -185,6 +195,7 @@ local function OpenMenu()
 	local selectSlot = nil
 	local selectReturn = "overview"
 	local attSlot = nil
+	local bgSlot = nil
 	local hoverItem = nil
 	local hoverAtt = nil
 
@@ -289,6 +300,12 @@ local function OpenMenu()
 		draw.SimpleText("SCP ARMORY — SITE-19", "SCPArmory_RoN_Small", w - 26, 18, COL.dim, TEXT_ALIGN_RIGHT)
 		draw.SimpleText(SCPArmory.FrUpper(jobName), "SCPArmory_RoN_Small", w - 26, 34, COL.faint, TEXT_ALIGN_RIGHT)
 
+		-- Aide caméra sur l'écran de l'arme
+		if mode == "modify" or mode == "attselect" then
+			draw.SimpleText("GLISSER : PIVOTER   ·   MOLETTE : ZOOM   ·   CLIC MOLETTE : DÉPLACER",
+				"SCPArmory_RoN_Small", w * 0.63, h - 40, COL.faint, TEXT_ALIGN_CENTER)
+		end
+
 		-- Petit radar de surveillance, balayage continu (bas droite)
 		local rx, ry, rr = w - 92, h - 96, 54
 		surface.DrawCircle(rx, ry, rr, COL.red.r, COL.red.g, COL.red.b, 34)
@@ -333,8 +350,15 @@ local function OpenMenu()
 	preview:SetDirectionalLight(BOX_FRONT, Color(92, 94, 102))
 	preview:SetDirectionalLight(BOX_RIGHT, Color(70, 26, 22))
 
-	-- Rotation du modèle à la souris (clic gauche ou droit maintenu)
+	-- Rotation du modèle à la souris (clic gauche ou droit maintenu),
+	-- déplacement latéral au clic molette maintenu
 	preview.OnMousePressed = function(s, mc)
+		if mc == MOUSE_MIDDLE then
+			s.panning = true
+			s.lastPX, s.lastPY = input.GetCursorPos()
+			s:MouseCapture(true)
+			return
+		end
 		if mc ~= MOUSE_LEFT and mc ~= MOUSE_RIGHT then return end
 		s.dragging = true
 		s.lastX, s.lastY = input.GetCursorPos()
@@ -342,32 +366,74 @@ local function OpenMenu()
 	end
 	preview.OnMouseReleased = function(s)
 		s.dragging = false
+		s.panning = false
 		s:MouseCapture(false)
 	end
 
-	-- Caméra de l'arme : vue plongeante d'établi (l'arme posée sur la table),
-	-- zoom à la molette
-	local function UpdateWeaponCam()
+	-- Cible caméra façon Gunsmith : vue plongeante d'établi + zoom + pan
+	local function WeaponCamTarget()
 		local c, size = preview.WepCenter, preview.WepSize
 		if not c then return end
-		local d = size * 1.0 * (preview.zoom or 1)
-		preview:SetFOV(32)
-		preview:SetCamPos(c + Vector(-d * 0.30, d * 0.85, d * 0.55))
-		preview:SetLookAt(c)
+		local d = size * 1.0 * (preview.zoomCur or 1)
+		local pos = c + Vector(-d * 0.30, d * 0.85, d * 0.55)
+		local aim = c
+		if preview.panOfs then
+			pos = pos + preview.panOfs
+			aim = aim + preview.panOfs
+		end
+		return pos, aim
 	end
 
 	preview.OnMouseWheeled = function(s, delta)
 		if not s.CurIsWeapon then return end
 		s.zoom = math.Clamp((s.zoom or 1) * (1 - delta * 0.12), 0.4, 2.2)
-		UpdateWeaponCam()
 		return true
 	end
+
 	preview.Think = function(s)
-		if not s.dragging then return end
-		local x, y = input.GetCursorPos()
-		s.userYaw = (s.userYaw or 0) + (x - (s.lastX or x)) * 0.45
-		s.userPitch = math.Clamp((s.userPitch or 0) + (y - (s.lastY or y)) * 0.25, -35, 35)
-		s.lastX, s.lastY = x, y
+		-- Rotation (clic gauche/droit maintenu)
+		if s.dragging then
+			local x, y = input.GetCursorPos()
+			s.userYaw = (s.userYaw or 0) + (x - (s.lastX or x)) * 0.45
+			s.userPitch = math.Clamp((s.userPitch or 0) + (y - (s.lastY or y)) * 0.25, -35, 35)
+			s.lastX, s.lastY = x, y
+		end
+
+		-- Déplacement latéral au clic molette (écran arme)
+		if s.panning and s.CurIsWeapon and s.WepCenter then
+			local x, y = input.GetCursorPos()
+			local dx = x - (s.lastPX or x)
+			local dy = y - (s.lastPY or y)
+			s.lastPX, s.lastPY = x, y
+
+			local pos, aim = WeaponCamTarget()
+			if pos then
+				local ang = (aim - pos):Angle()
+				local k = (s.WepSize or 40) * 0.0026 * (s.zoomCur or 1)
+				local ofs = (s.panOfs or Vector(0, 0, 0)) - ang:Right() * (dx * k) + ang:Up() * (dy * k)
+				local maxLen = (s.WepSize or 40) * 0.8
+				if ofs:Length() > maxLen then ofs = ofs:GetNormalized() * maxLen end
+				s.panOfs = ofs
+			end
+		end
+
+		-- Caméra amortie façon Gunsmith : zoom lissé, glissement, flottement
+		if s.CurIsWeapon and s.WepCenter then
+			s.zoomCur = Lerp(math.Clamp(FrameTime() * 8, 0, 1), s.zoomCur or 1, s.zoom or 1)
+
+			local pos, aim = WeaponCamTarget()
+			if pos then
+				local t = RealTime()
+				local sz = s.WepSize or 40
+				local drift = Vector(0, math.sin(t * 0.31) * sz * 0.012, math.sin(t * 0.23) * sz * 0.008)
+				local fr = math.Clamp(FrameTime() * 6, 0, 1)
+				s.camPos = LerpVector(fr, s.camPos or pos, pos + drift)
+				s.camAim = LerpVector(fr, s.camAim or aim, aim)
+				s:SetFOV(32)
+				s:SetCamPos(s.camPos)
+				s:SetLookAt(s.camAim)
+			end
+		end
 	end
 
 	preview.LayoutEntity = function(pnl, ent)
@@ -460,15 +526,28 @@ local function OpenMenu()
 			preview.WepCenter = (mn + mx) * 0.5
 			preview.WepSize = math.max(mx.x - mn.x, mx.y - mn.y, mx.z - mn.z, 8)
 			preview.zoom = 1
-			UpdateWeaponCam()
+			preview.zoomCur = 1.35 -- la caméra glisse en se rapprochant
+			preview.panOfs = nil
+			preview.camPos = nil
+			preview.camAim = nil
 		else
 			preview.WepCenter = nil
 			local dist = SCPArmory.Config.PreviewDistance or 120
 			preview:SetFOV(30)
 			preview:SetCamPos(Vector(dist, 0, 55))
 			preview:SetLookAt(Vector(0, 0, 42))
-			local seq = ent:LookupSequence("idle_all_01")
-			if seq and seq > 0 then ent:ResetSequence(seq) end
+
+			-- Belle posture d'accueil (bras croisés si le modèle la possède)
+			preview.Posed = false
+			for _, sq in ipairs({ SCPArmory.Config.PreviewPose or "pose_standing_02",
+				"pose_standing_02", "pose_standing_01", "idle_all_01" }) do
+				local seq = ent:LookupSequence(sq)
+				if seq and seq > 0 then
+					ent:ResetSequence(seq)
+					preview.Posed = (sq ~= "idle_all_01")
+					break
+				end
+			end
 		end
 	end
 
@@ -508,6 +587,10 @@ local function OpenMenu()
 		SCPArmory.ApplyBodygroups(ent, selection)
 
 		ClearHeldWeapon()
+
+		-- Bras croisés : pas d'arme en main sur la pose d'accueil
+		if preview.Posed then return end
+
 		local item = SCPArmory.GetItem("primary", selection.primary)
 		if not HasModel(item) then return end
 
@@ -663,10 +746,13 @@ local function OpenMenu()
 				"SCPArmory_RoN_Label", 28, 48, redCol, 2)
 			draw.SimpleText(SlotByKey(curWeaponKey).label, "SCPArmory_RoN_Label", 0, 82, COL.dim)
 		else
-			DrawSpacedText(selectSlot and selectSlot.label or "", "SCPArmory_RoN_Big", 0, 8, COL.text, 3)
+			local title = (mode == "bgselect") and SCPArmory.FrUpper(bgSlot and bgSlot.name or "")
+				or (selectSlot and selectSlot.label or "")
+			DrawSpacedText(title, "SCPArmory_RoN_Big", 0, 8, COL.text, 3)
 			surface.SetDrawColor(COL.red)
 			surface.DrawRect(0, 52, barW, 3)
-			DrawSpacedText("SÉLECTION D'ÉQUIPEMENT", "SCPArmory_RoN_Label", 28, 48, redCol, 2)
+			DrawSpacedText(mode == "bgselect" and "APPARENCE DE L'OPÉRATEUR" or "SÉLECTION D'ÉQUIPEMENT",
+				"SCPArmory_RoN_Label", 28, 48, redCol, 2)
 		end
 
 		-- La ligne de séparation se déploie de gauche à droite
@@ -910,6 +996,18 @@ local function OpenMenu()
 				net.WriteString(attId)
 			end
 		end
+
+		-- Apparence : bodygroups personnalisés
+		local bgMap = selection.bg or {}
+		net.WriteUInt(math.min(table.Count(bgMap), 24), 5)
+		local sent = 0
+		for name, val in pairs(bgMap) do
+			if sent >= 24 then break end
+			net.WriteString(name)
+			net.WriteUInt(math.Clamp(val, 0, 31), 5)
+			sent = sent + 1
+		end
+
 		net.SendToServer()
 
 		SaveSelection(selection, autoChk:GetChecked(), attSel)
@@ -925,6 +1023,9 @@ local function OpenMenu()
 		if mode == "attselect" then
 			mode = "modify"
 			attSlot = nil
+		elseif mode == "bgselect" then
+			mode = "overview"
+			bgSlot = nil
 		elseif mode == "select" then
 			mode = selectReturn
 			selectSlot = nil
@@ -1382,11 +1483,102 @@ local function OpenMenu()
 			for _, key in ipairs({ "armor", "helmet" }) do
 				AddOverviewEntry(SlotByKey(key), false)
 			end
+
+			-- Apparence : bodygroups autorisés par la config, style RoN
+			local bgOpts = {}
+			for _, bg in ipairs(LocalPlayer():GetBodyGroups() or {}) do
+				local nm = string.lower(tostring(bg.name or ""))
+				if (bg.num or 0) > 1 and SCPArmory.AllowedBodygroups and SCPArmory.AllowedBodygroups[nm] then
+					table.insert(bgOpts, { name = nm, id = bg.id, num = bg.num })
+				end
+			end
+			if #bgOpts > 0 then
+				AddSection("APPARENCE")
+				for _, opt in ipairs(bgOpts) do
+					local cur = (selection.bg and selection.bg[opt.name])
+						or LocalPlayer():GetBodygroup(opt.id) or 0
+
+					local btn = scroll:Add("DButton")
+					btn:Dock(TOP)
+					btn:DockMargin(0, 0, 10, 0)
+					btn:SetTall(48)
+					btn:SetText("")
+					btn.Paint = function(s, w, h)
+						local hov = s:IsHovered()
+						s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
+						if s.hf > 0.01 then
+							surface.SetDrawColor(255, 255, 255, 6 * s.hf)
+							surface.DrawRect(0, 0, w, h)
+							surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * s.hf)
+							surface.DrawRect(-8, 0, 2, h)
+						end
+						local ox = math.Round(s.hf * 6)
+						draw.SimpleText(SCPArmory.FrUpper(opt.name), "SCPArmory_RoN_Label", ox, 6, COL.dim)
+						DrawSpacedText("VARIANTE " .. (cur + 1) .. " / " .. opt.num, "SCPArmory_RoN_NameSm", ox, 22,
+							hov and COL.text or COL.soft, 1)
+						surface.SetDrawColor(COL.lineF)
+						surface.DrawRect(0, h - 1, w, 1)
+					end
+					btn.DoClick = function()
+						mode = "bgselect"
+						bgSlot = opt
+						surface.PlaySound("ui/buttonclick.wav")
+						RebuildColumn()
+					end
+				end
+			end
 		elseif mode == "modify" then
 			descLabel:SetText("")
 			BuildModify()
 		elseif mode == "attselect" then
 			BuildAttSelect()
+		elseif mode == "bgselect" then
+			-- Choix d'une variante d'apparence, style RoN
+			AddBackHeader(SCPArmory.FrUpper(bgSlot.name), GoBack)
+
+			local curVal = (selection.bg and selection.bg[bgSlot.name])
+				or LocalPlayer():GetBodygroup(bgSlot.id) or 0
+
+			for v = 0, bgSlot.num - 1 do
+				local row = scroll:Add("DButton")
+				row:Dock(TOP)
+				row:DockMargin(0, 0, 10, 0)
+				row:SetTall(44)
+				row:SetText("")
+				row.Paint = function(s, w, h)
+					local equipped = (curVal == v)
+					local hov = s:IsHovered()
+					s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
+
+					if s.hf > 0.01 then
+						surface.SetDrawColor(255, 255, 255, 6 * s.hf)
+						surface.DrawRect(0, 0, w, h)
+						surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * s.hf)
+						surface.DrawRect(-8, 0, 2, h)
+					end
+					if equipped then
+						surface.SetDrawColor(COL.red)
+						surface.DrawRect(-8, 0, 2, h)
+					end
+
+					local ox = math.Round(s.hf * 6)
+					DrawSpacedText("VARIANTE " .. (v + 1), "SCPArmory_RoN_NameSm", ox, 12,
+						(equipped or hov) and COL.text or COL.soft, 1)
+					if equipped then
+						draw.SimpleText("ÉQUIPÉE", "SCPArmory_RoN_Small", w - 10, 16, COL.red, TEXT_ALIGN_RIGHT)
+					end
+					surface.SetDrawColor(COL.lineF)
+					surface.DrawRect(0, h - 1, w, 1)
+				end
+				row.DoClick = function()
+					selection.bg = selection.bg or {}
+					selection.bg[bgSlot.name] = v
+					mode = "overview"
+					bgSlot = nil
+					surface.PlaySound("ui/buttonclick.wav")
+					RebuildColumn()
+				end
+			end
 		else
 			AddBackHeader(selectSlot.label, GoBack)
 			for _, item in ipairs(SCPArmory.Items[selectSlot.pool]) do
