@@ -185,9 +185,22 @@ local function OpenMenu()
 	frame:SetAlpha(0)
 	frame:AlphaTo(255, 0.18, 0)
 
+	local openTime = RealTime()
+
 	frame.Paint = function(_, w, h)
 		surface.SetDrawColor(COL.bg)
 		surface.DrawRect(0, 0, w, h)
+
+		-- Grille technique très discrète derrière l'opérateur, dérive lente
+		local gx0 = math.floor(w * 0.30)
+		local drift = (RealTime() * 2.5) % 64
+		surface.SetDrawColor(255, 255, 255, 4)
+		for x = gx0 - drift, w, 64 do
+			surface.DrawRect(x, 0, 1, h)
+		end
+		for y = -drift, h, 64 do
+			surface.DrawRect(gx0, y, w - gx0, 1)
+		end
 
 		-- Dégradé sombre derrière la colonne pour la lisibilité, façon RoN
 		local gw = 560
@@ -199,6 +212,8 @@ local function OpenMenu()
 		end
 	end
 	frame.PaintOver = function(_, w, h)
+		local rt = RealTime()
+
 		-- Vignette cinématique haut/bas
 		local vh = 80
 		for i = 0, 7 do
@@ -208,13 +223,53 @@ local function OpenMenu()
 			surface.DrawRect(0, h - (i + 1) * (vh / 8), w, math.ceil(vh / 8))
 		end
 
-		-- Fine ligne de balayage qui descend lentement (ambiance moniteur)
-		local sy = (RealTime() * 34) % (h + 120) - 60
-		surface.SetDrawColor(255, 255, 255, 4)
+		-- Fine ligne de balayage, très discrète (ambiance moniteur)
+		local sy = (rt * 26) % (h + 120) - 60
+		surface.SetDrawColor(255, 255, 255, 3)
 		surface.DrawRect(0, sy, w, 2)
+
+		-- Coins de cadre tactique, pulsation lente
+		local ca = 90 + math.sin(rt * 1.3) * 25
+		surface.SetDrawColor(COL.line.r, COL.line.g, COL.line.b, ca)
+		local bl, bt = 26, 2
+		for _, c in ipairs({ { 16, 12, 1, 1 }, { w - 16, 12, -1, 1 }, { 16, h - 12, 1, -1 }, { w - 16, h - 12, -1, -1 } }) do
+			local cx, cy, dx, dy = c[1], c[2], c[3], c[4]
+			surface.DrawRect(dx > 0 and cx or cx - bl, dy > 0 and cy or cy - bt, bl, bt)
+			surface.DrawRect(dx > 0 and cx or cx - bt, dy > 0 and cy or cy - bl, bt, bl)
+		end
+
+		-- Bloc d'état : LED en double-flash militaire + horloge + session
+		local bt2 = rt % 2.4
+		local ledOn = bt2 < 0.08 or (bt2 > 0.24 and bt2 < 0.32)
+		surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, ledOn and 255 or 60)
+		surface.DrawRect(w - 26 - 4, 52, 4, 4)
+
+		local session = math.floor(rt - openTime)
+		local status = string.format("EN LIGNE  //  %s  //  SESSION %02d:%02d",
+			os.date("%H:%M:%S"), math.floor(session / 60), session % 60)
+		draw.SimpleText(status, "SCPArmory_RoN_Small", w - 36, 50, COL.faint, TEXT_ALIGN_RIGHT)
 
 		draw.SimpleText("SCP ARMORY — SITE-19", "SCPArmory_RoN_Small", w - 26, 18, COL.dim, TEXT_ALIGN_RIGHT)
 		draw.SimpleText(SCPArmory.FrUpper(jobName), "SCPArmory_RoN_Small", w - 26, 34, COL.faint, TEXT_ALIGN_RIGHT)
+
+		-- Petit radar de surveillance, balayage continu (bas droite)
+		local rx, ry, rr = w - 92, h - 96, 54
+		surface.DrawCircle(rx, ry, rr, COL.red.r, COL.red.g, COL.red.b, 34)
+		surface.DrawCircle(rx, ry, rr * 0.55, COL.red.r, COL.red.g, COL.red.b, 22)
+		surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 26)
+		surface.DrawRect(rx - rr, ry, rr * 2, 1)
+		surface.DrawRect(rx, ry - rr, 1, rr * 2)
+
+		-- Aiguille avec traînée
+		local sweep = rt * 1.4
+		for i = 0, 5 do
+			local a = sweep - i * 0.07
+			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 70 - i * 11)
+			surface.DrawLine(rx, ry, rx + math.cos(a) * rr, ry + math.sin(a) * rr)
+		end
+		surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 120)
+		surface.DrawRect(rx - 1, ry - 1, 3, 3)
+		draw.SimpleText("SURVEILLANCE // S-19", "SCPArmory_RoN_Small", rx, ry + rr + 8, COL.faint, TEXT_ALIGN_CENTER)
 	end
 
 	-- Fermeture en fondu (déploiement, ÉCHAP, bouton retour)
@@ -563,6 +618,17 @@ local function OpenMenu()
 		surface.DrawRect(0, titleH - 6, w * tf, 1)
 	end
 
+	-- Balayage lumineux unique qui parcourt la colonne au changement d'écran
+	column.PaintOver = function(s, w, h)
+		local t = (RealTime() - (s.animT or 0)) / 0.4
+		if t >= 1 then return end
+		local y = Ease(t) * h
+		for i = 0, 5 do
+			surface.SetDrawColor(255, 255, 255, 9 - i * 1.4)
+			surface.DrawRect(0, y - i * 6, w, 4)
+		end
+	end
+
 	local scroll = vgui.Create("DScrollPanel", column)
 	scroll:SetPos(0, titleH)
 	scroll:SetSize(colW, colH - titleH - bottomH)
@@ -740,10 +806,13 @@ local function OpenMenu()
 	deployBtn.Paint = function(s, w, h)
 		s.hf = Lerp(FrameTime() * 10, s.hf or 0, s:IsHovered() and 1 or 0)
 
+		-- Respiration discrète au repos
+		local pulse = (1 - s.hf) * math.sin(RealTime() * 2.2) * 7
+
 		surface.SetDrawColor(
-			Lerp(s.hf, COL.red.r, COL.redHi.r),
-			Lerp(s.hf, COL.red.g, COL.redHi.g),
-			Lerp(s.hf, COL.red.b, COL.redHi.b), 255)
+			math.Clamp(Lerp(s.hf, COL.red.r, COL.redHi.r) + pulse, 0, 255),
+			math.Clamp(Lerp(s.hf, COL.red.g, COL.redHi.g) + pulse * 0.3, 0, 255),
+			math.Clamp(Lerp(s.hf, COL.red.b, COL.redHi.b) + pulse * 0.3, 0, 255), 255)
 		surface.DrawRect(0, 0, w, h)
 
 		-- Liseré blanc qui s'allume au survol
