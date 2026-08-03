@@ -23,6 +23,15 @@ local function StoreKey(ply)
 	return ply:SteamID64() or ply:SteamID() or tostring(ply:EntIndex())
 end
 
+-- Anti-spam réseau : au plus une action par fenêtre de temps et par joueur
+local function RateLimit(ply, key, delay)
+	if not IsValid(ply) then return false end
+	local t = CurTime()
+	if (ply[key] or 0) > t then return false end
+	ply[key] = t + delay
+	return true
+end
+
 -- Le joueur est-il à portée d'une armoire d'armurerie ?
 function SCPArmory.NearLocker(ply)
 	local maxDist = SCPArmory.Config.UseDistance ^ 2
@@ -121,6 +130,8 @@ end
 
 -- Réception du loadout choisi par le client
 net.Receive("SCPArmory_Apply", function(_, ply)
+	if not RateLimit(ply, "SCPArmoryRL_Apply", 1.5) then return end
+
 	if SCPArmory.Config.RequireEntity and not SCPArmory.NearLocker(ply) then
 		Notify(ply, "Vous devez être à proximité d'une armoire d'armurerie pour vous équiper.")
 		return
@@ -358,11 +369,13 @@ local function SendConfig(target)
 end
 
 net.Receive("SCPArmory_RequestConfig", function(_, ply)
+	if not RateLimit(ply, "SCPArmoryRL_Request", 5) then return end
 	SendConfig(ply)
 end)
 
 net.Receive("SCPArmory_SaveConfig", function(_, ply)
 	if not IsValid(ply) or not ply:IsSuperAdmin() then return end
+	if not RateLimit(ply, "SCPArmoryRL_Save", 2) then return end
 
 	local len = net.ReadUInt(16)
 	local json = util.Decompress(net.ReadData(len) or "") or ""

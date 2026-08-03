@@ -68,12 +68,29 @@ local ACCENTS = {
 	["ç"] = "Ç", ["œ"] = "Œ",
 }
 
+-- Mémoïsé : appelé dans les Paint à chaque frame, le gsub ne doit tourner
+-- qu'une fois par chaîne distincte
+local upperCache = {}
+local upperCount = 0
+
 function SCPArmory.FrUpper(s)
-	s = string.upper(tostring(s or ""))
+	s = tostring(s or "")
+	local hit = upperCache[s]
+	if hit then return hit end
+
+	local out = string.upper(s)
 	for l, u in pairs(ACCENTS) do
-		s = string.gsub(s, l, u)
+		out = string.gsub(out, l, u)
 	end
-	return s
+
+	if upperCount > 2048 then
+		upperCache = {}
+		upperCount = 0
+	end
+	upperCache[s] = out
+	upperCount = upperCount + 1
+
+	return out
 end
 
 -- Un objet réservé à certains jobs (champ item.jobs) est totalement invisible

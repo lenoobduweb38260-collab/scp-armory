@@ -3,13 +3,27 @@
 -- plein écran sur fond noir, colonne d'équipement à gauche, aperçu en grand,
 -- accessoires ARC9 choisis uniquement via ce menu.
 
-surface.CreateFont("SCPArmory_RoN_Huge", { font = "Roboto", size = 46, weight = 200 })
-surface.CreateFont("SCPArmory_RoN_Big", { font = "Roboto", size = 30, weight = 300 })
-surface.CreateFont("SCPArmory_RoN_Name", { font = "Roboto", size = 21, weight = 500 })
-surface.CreateFont("SCPArmory_RoN_NameSm", { font = "Roboto", size = 17, weight = 500 })
-surface.CreateFont("SCPArmory_RoN_Label", { font = "Roboto", size = 12, weight = 700 })
-surface.CreateFont("SCPArmory_RoN_Small", { font = "Roboto", size = 12, weight = 500 })
-surface.CreateFont("SCPArmory_RoN_Btn", { font = "Roboto", size = 15, weight = 800 })
+-- Polices à l'échelle de la résolution (recréées si elle change en jeu)
+local fontScale = 0
+local function EnsureFonts()
+	local scale = math.Clamp(ScrH() / 1080, 0.85, 1.25)
+	if math.abs(scale - fontScale) < 0.01 then return end
+	fontScale = scale
+
+	local function F(name, size, weight)
+		surface.CreateFont(name, { font = "Roboto", size = math.Round(size * scale), weight = weight })
+	end
+
+	F("SCPArmory_RoN_Huge", 46, 200)
+	F("SCPArmory_RoN_Big", 30, 300)
+	F("SCPArmory_RoN_Name", 21, 500)
+	F("SCPArmory_RoN_NameSm", 17, 500)
+	F("SCPArmory_RoN_Label", 12, 700)
+	F("SCPArmory_RoN_Small", 12, 500)
+	F("SCPArmory_RoN_Btn", 15, 800)
+end
+
+EnsureFonts()
 
 local COL = {
 	bg     = Color(5, 5, 7, 253),
@@ -151,6 +165,8 @@ end
 
 local function OpenMenu()
 	if IsValid(activeMenu) then activeMenu:Remove() end
+
+	EnsureFonts()
 
 	local selection, autoApply, attSel = LoadSaved()
 	local plyModel = LocalPlayer():GetModel()
@@ -453,8 +469,11 @@ local function OpenMenu()
 		ent:SetupBones()
 		for _, a in ipairs(s.AttModels) do
 			if IsValid(a.mdl) then
-				local boneId = ent:LookupBone(a.slot.Bone or "")
-				local m = boneId and ent:GetBoneMatrix(boneId) or nil
+				-- Os mémorisé après la première recherche
+				if a.boneId == nil then
+					a.boneId = ent:LookupBone(a.slot.Bone or "") or false
+				end
+				local m = a.boneId and ent:GetBoneMatrix(a.boneId) or nil
 				if m then
 					local bpos, bang = m:GetTranslation(), m:GetAngles()
 					local op = a.slot.Pos or vector_origin
@@ -670,8 +689,9 @@ local function OpenMenu()
 
 	-- --------------------------------------------------- colonne de gauche
 
+	-- Largeur de colonne adaptative (petites résolutions et ultrawide)
 	local colX, colY = 48, 34
-	local colW = 350
+	local colW = math.Clamp(math.floor(ScrW() * 0.22), 320, 420)
 	local colH = ScrH() - colY * 2
 	local bottomH = 184
 	local titleH = 112
@@ -679,10 +699,14 @@ local function OpenMenu()
 	local column = vgui.Create("DPanel", frame)
 	column:SetPos(colX, colY)
 	column:SetSize(colW, colH)
+	-- Couleur réutilisée chaque frame (pas d'allocation dans le Paint)
+	local redAnim = Color(COL.red.r, COL.red.g, COL.red.b, 255)
+
 	column.Paint = function(s, w)
 		-- Balayage animé du titre à chaque changement d'écran
 		local tf = Ease((RealTime() - (s.animT or 0)) / 0.35)
-		local redCol = Color(COL.red.r, COL.red.g, COL.red.b, 255 * tf)
+		redAnim.a = 255 * tf
+		local redCol = redAnim
 		local barW = math.Round(20 * tf)
 
 		if mode == "overview" then
@@ -839,8 +863,13 @@ local function OpenMenu()
 		end
 
 		-- Vues LOADOUT et MODIFY : le résumé du chargement
-		local stats = SCPArmory.ComputeStats(selection)
+		-- (recalculé au plus toutes les 0.15 s, pas à chaque frame)
 		local s = bottom
+		if not s.statsNext or RealTime() > s.statsNext then
+			s.statsCache = SCPArmory.ComputeStats(selection)
+			s.statsNext = RealTime() + 0.15
+		end
+		local stats = s.statsCache
 
 		draw.SimpleText("CHARGEMENT", "SCPArmory_RoN_Label", 0, 8, COL.dim)
 		draw.SimpleText(stats.class, "SCPArmory_RoN_Label", w - 10, 8, COL.red, TEXT_ALIGN_RIGHT)
@@ -892,9 +921,10 @@ local function OpenMenu()
 		surface.PlaySound("ui/buttonclick.wav")
 	end
 
+	local backW = 118
 	local deployBtn = vgui.Create("DButton", bottom)
 	deployBtn:SetPos(0, bottomH - 46)
-	deployBtn:SetSize(212, 40)
+	deployBtn:SetSize(colW - backW - 10, 40)
 	deployBtn:SetText("")
 	deployBtn.Paint = function(s, w, h)
 		s.hf = Lerp(FrameTime() * 10, s.hf or 0, s:IsHovered() and 1 or 0)
@@ -977,8 +1007,8 @@ local function OpenMenu()
 	end
 
 	local backBtn = vgui.Create("DButton", bottom)
-	backBtn:SetPos(222, bottomH - 46)
-	backBtn:SetSize(118, 40)
+	backBtn:SetPos(colW - backW, bottomH - 46)
+	backBtn:SetSize(backW, 40)
 	backBtn:SetText("")
 	backBtn.Paint = function(s, w, h)
 		s.hf = Lerp(FrameTime() * 10, s.hf or 0, s:IsHovered() and 1 or 0)
@@ -1198,10 +1228,11 @@ local function OpenMenu()
 			surface.DrawRect(0, h - 1, w, 1)
 		end
 
+		local tabW = math.floor(colW / 2)
 		for i, wkey in ipairs(WEAPON_KEYS) do
 			local tab = vgui.Create("DButton", tabs)
-			tab:SetPos((i - 1) * 170, 0)
-			tab:SetSize(164, 33)
+			tab:SetPos((i - 1) * tabW, 0)
+			tab:SetSize(tabW - 6, 33)
 			tab:SetText("")
 			tab.Paint = function(s, w, h)
 				local active = (curWeaponKey == wkey)
