@@ -90,6 +90,32 @@ configuration en jeu) :
 
 ConVar serveur : `scp_armory_autoapply 1/0` — autorise la réapplication du loadout au respawn.
 
+## Journaux (logs staff)
+
+L'addon journalise côté serveur, dans un **fichier par jour**
+(`data/scp_armory/logs/AAAA-MM-JJ.txt`) et dans la **console serveur** (désactivables dans le
+panneau de configuration, rotation automatique après `LogRetentionDays` jours) :
+
+- **DÉPLOIEMENT** : joueur (pseudo + SteamID), métier, armes choisies, nombre d'accessoires,
+  poids/mobilité/armure ;
+- **REFUS** : tentative d'équiper des objets non autorisés pour le métier ;
+- **CONFIG** : qui a enregistré la configuration, avec le **diff des options modifiées**
+  (`RequireEntity: false → true`, …) et les compteurs d'icônes/restrictions ;
+- **SÉCURITÉ** : tentative d'écriture de la configuration par un non-superadmin.
+
+**Intégration avec vos logs staff** : chaque entrée est aussi émise via un hook universel —
+branchez n'importe quel système en trois lignes :
+
+```lua
+hook.Add("SCPArmory_Log", "MonSystemeDeLogs", function(categorie, message, ply)
+    MonSysteme:Ajouter("SCP Armory", "[" .. categorie .. "] " .. message)
+end)
+```
+
+**bLogs (Billy's Logs) et mLogs** sont détectés automatiquement au chargement et reçoivent les
+entrées en best-effort (appels protégés : si votre version expose une API différente, les logs
+fichier/console/hook continuent de fonctionner — utilisez alors le hook ci-dessus).
+
 ## Limiter les armes par job
 
 Dans le panneau de configuration en jeu, chaque objet a un champ **JOBS** : entrez les noms exacts

@@ -14,6 +14,7 @@ if SERVER then
 	include("scp_armory/sh_items.lua")
 	include("scp_armory/sh_autoload.lua")
 	include("scp_armory/sh_arc9.lua")
+	include("scp_armory/sv_logs.lua")
 	include("scp_armory/sv_armory.lua")
 else
 	include("scp_armory/sh_config.lua")

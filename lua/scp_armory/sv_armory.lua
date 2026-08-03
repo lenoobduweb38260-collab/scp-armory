@@ -190,9 +190,24 @@ net.Receive("SCPArmory_Apply", function(_, ply)
 
 	if refused then
 		Notify(ply, "Certains objets ne sont pas autorisés pour votre métier et ont été retirés.")
+		SCPArmory.AddLog("REFUS", SCPArmory.PlayerTag(ply)
+			.. " a tenté d'équiper des objets non autorisés pour son métier ["
+			.. (team.GetName(ply:Team()) or "?") .. "]", ply)
 	end
 
 	SCPArmory.Apply(ply, loadout)
+
+	-- Journal du déploiement (les ré-applications au respawn ne sont pas loguées)
+	local attCount = 0
+	for _, map in pairs(loadout.atts or {}) do
+		for _ in pairs(map) do attCount = attCount + 1 end
+	end
+	local stats = SCPArmory.ComputeStats(loadout)
+	SCPArmory.AddLog("DÉPLOIEMENT", string.format(
+		"%s [%s] — principale: %s, secondaire: %s, accessoires: %d, %.1f kg / mobilité %d%% / armure %d",
+		SCPArmory.PlayerTag(ply), team.GetName(ply:Team()) or "?",
+		loadout.primary or "none", loadout.secondary or "none",
+		attCount, stats.weight, stats.mobility, stats.armor), ply)
 end)
 
 -- Réapplication au respawn + remise à zéro des effets
@@ -283,6 +298,9 @@ local EDITABLE = {
 	BlockARC9Customize = "boolean",
 	AutoLoadWeapons    = "boolean",
 	MenuScene          = "boolean",
+	LogToFile          = "boolean",
+	LogToConsole       = "boolean",
+	LogRetentionDays   = "number",
 	UseDistance        = "number",
 	PreviewDistance    = "number",
 	BaseWalkSpeed      = "number",
@@ -315,11 +333,12 @@ end
 -- Bornes de sécurité par option numérique (un superadmin compromis ne peut
 -- pas casser le serveur avec des valeurs absurdes)
 local NUM_BOUNDS = {
-	UseDistance     = { 32, 2048 },
-	PreviewDistance = { 40, 400 },
-	BaseWalkSpeed   = { 50, 1000 },
-	BaseRunSpeed    = { 50, 2000 },
-	MaxArmor        = { 1, 1000 },
+	UseDistance      = { 32, 2048 },
+	PreviewDistance  = { 40, 400 },
+	BaseWalkSpeed    = { 50, 1000 },
+	BaseRunSpeed     = { 50, 2000 },
+	MaxArmor         = { 1, 1000 },
+	LogRetentionDays = { 0, 365 },
 }
 
 local function ApplyOverrides(data)
@@ -405,7 +424,15 @@ net.Receive("SCPArmory_RequestConfig", function(_, ply)
 end)
 
 net.Receive("SCPArmory_SaveConfig", function(_, ply)
-	if not IsValid(ply) or not ply:IsSuperAdmin() then return end
+	if not IsValid(ply) then return end
+	if not ply:IsSuperAdmin() then
+		-- Un client modifié qui tente d'écrire la config est signalé au staff
+		if RateLimit(ply, "SCPArmoryRL_BadSave", 10) then
+			SCPArmory.AddLog("SÉCURITÉ", SCPArmory.PlayerTag(ply)
+				.. " a tenté d'enregistrer la configuration sans être superadmin", ply)
+		end
+		return
+	end
 	if not RateLimit(ply, "SCPArmoryRL_Save", 2) then return end
 
 	local len = net.ReadUInt(16)
@@ -414,10 +441,29 @@ net.Receive("SCPArmory_SaveConfig", function(_, ply)
 	local data = util.JSONToTable(json)
 	if not istable(data) then return end
 
+	-- Instantané avant application, pour journaliser le diff
+	local before = {}
+	for k in pairs(EDITABLE) do before[k] = SCPArmory.Config[k] end
+
 	ApplyOverrides(data)
 	SaveConfigToDisk()
 	SendConfig()
 	Notify(ply, "Configuration enregistrée et diffusée à tous les joueurs.")
+
+	local changes = {}
+	for k in pairs(EDITABLE) do
+		if SCPArmory.Config[k] ~= before[k] then
+			table.insert(changes, string.format("%s: %s → %s",
+				k, tostring(before[k]), tostring(SCPArmory.Config[k])))
+		end
+	end
+	table.sort(changes)
+
+	SCPArmory.AddLog("CONFIG", string.format(
+		"%s a enregistré la configuration — %s ; icônes: %d, objets restreints par job: %d",
+		SCPArmory.PlayerTag(ply),
+		#changes > 0 and table.concat(changes, ", ") or "options inchangées",
+		table.Count(SCPArmory.ItemIcons), table.Count(SCPArmory.ItemJobs)), ply)
 end)
 
 LoadConfigFromDisk()

@@ -50,6 +50,15 @@ SCPArmory.Config = {
 	-- l'opérateur, caisse d'armes sous l'arme en personnalisation
 	MenuScene = true,
 
+	-- Journalisation serveur : fichiers datés dans data/scp_armory/logs/
+	LogToFile = true,
+
+	-- Journalisation dans la console serveur
+	LogToConsole = true,
+
+	-- Durée de conservation des fichiers de logs (jours, 0 = illimité)
+	LogRetentionDays = 14,
+
 	-- Charge automatiquement les armes des packs installés (ARC9, M9K…)
 	-- dans les pools principale/secondaire selon leur emplacement d'arme
 	AutoLoadWeapons = true,

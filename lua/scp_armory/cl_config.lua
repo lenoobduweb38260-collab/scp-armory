@@ -396,6 +396,13 @@ function SCPArmory.OpenConfigMenu()
 	AddCheck("AutoLoadWeapons", "Charger automatiquement les armes des packs installés (ARC9, M9K…) — appliqué au prochain redémarrage")
 	AddCheck("MenuScene", "Décor 3D dans le menu : armoires et caisses derrière l'opérateur, caisse d'armes sous l'arme")
 	AddNumber("UseDistance", "Portée autour de l'armoire (unités)", 60, 512)
+
+	Section("JOURNAUX")
+	AddCheck("LogToFile", "Écrire les logs dans data/scp_armory/logs/ (un fichier par jour)")
+	AddCheck("LogToConsole", "Afficher les logs dans la console serveur")
+	AddNumber("LogRetentionDays", "Conservation des fichiers de logs (jours, 0 = illimité)", 0, 365)
+
+	Section("AFFICHAGE & GAMEPLAY")
 	AddNumber("PreviewDistance", "Distance de la caméra sur l'opérateur (plus grand = plus loin)", 60, 250)
 	AddNumber("BaseWalkSpeed", "Vitesse de marche de base", 80, 400)
 	AddNumber("BaseRunSpeed", "Vitesse de course de base", 150, 700)
