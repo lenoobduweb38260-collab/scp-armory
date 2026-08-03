@@ -265,6 +265,7 @@ local EDITABLE = {
 	RequireEntity      = "boolean",
 	BlockARC9Customize = "boolean",
 	AutoLoadWeapons    = "boolean",
+	MenuScene          = "boolean",
 	UseDistance        = "number",
 	PreviewDistance    = "number",
 	BaseWalkSpeed      = "number",

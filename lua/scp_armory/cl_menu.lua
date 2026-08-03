@@ -289,6 +289,13 @@ local function OpenMenu()
 	preview:SetAnimated(true)
 	preview:SetCursor("sizeall")
 
+	-- Éclairage d'armurerie : ambiance sombre, lumière plongeante chaude,
+	-- très léger rappel rouge sur un flanc
+	preview:SetAmbientLight(Color(52, 54, 60))
+	preview:SetDirectionalLight(BOX_TOP, Color(255, 244, 228))
+	preview:SetDirectionalLight(BOX_FRONT, Color(92, 94, 102))
+	preview:SetDirectionalLight(BOX_RIGHT, Color(70, 26, 22))
+
 	-- Rotation du modèle à la souris (clic gauche ou droit maintenu)
 	preview.OnMousePressed = function(s, mc)
 		if mc ~= MOUSE_LEFT and mc ~= MOUSE_RIGHT then return end
@@ -348,12 +355,93 @@ local function OpenMenu()
 		preview.AttModels = nil
 	end
 
+	-- ------------------------------------------------ décor 3D de l'aperçu
+	-- LOADOUT : armoires/casiers en fond, caisses empilées, armes du loadout
+	-- adossées au râtelier. MODIFIER L'ARME : l'arme au-dessus d'une caisse.
+
+	local sceneProps = {}
+
+	local function ClearScene()
+		for _, p in ipairs(sceneProps) do
+			if IsValid(p) then p:Remove() end
+		end
+		sceneProps = {}
+	end
+
+	local function AddSceneProp(mdl, pos, ang, tint)
+		if not (isstring(mdl) and file.Exists(mdl, "GAME")) then return end
+		local e = ClientsideModel(mdl, RENDERGROUP_OPAQUE)
+		if not IsValid(e) then return end
+		e:SetNoDraw(true)
+		e:SetPos(pos)
+		e:SetAngles(ang)
+		e.Tint = tint
+		table.insert(sceneProps, e)
+		return e
+	end
+
+	local function SceneEnabled()
+		return SCPArmory.Config.MenuScene ~= false
+	end
+
+	local function BuildOperatorScene()
+		ClearScene()
+		if not SceneEnabled() then return end
+
+		-- Sol sombre
+		AddSceneProp("models/hunter/plates/plate8x8.mdl", Vector(-30, 0, -1), Angle(0, 0, 0), 0.16)
+
+		-- Mur d'armoires métalliques derrière l'opérateur
+		for i = -1, 1 do
+			AddSceneProp("models/props_c17/lockers001a.mdl", Vector(-88, i * 52, 0), Angle(0, 0, 0), 0.55)
+		end
+
+		-- Caisses empilées sur le côté
+		AddSceneProp("models/props_junk/wood_crate001a.mdl", Vector(-56, 82, 0), Angle(0, 18, 0), 0.6)
+		AddSceneProp("models/props_junk/wood_crate001a.mdl", Vector(-58, 80, 34), Angle(0, 42, 0), 0.6)
+		AddSceneProp("models/items/ammocrate_ar2.mdl", Vector(-52, -84, 0), Angle(0, -20, 0), 0.65)
+
+		-- Les armes du loadout adossées au râtelier, en fond
+		local lean = {
+			{ key = "primary", pos = Vector(-70, -34, 26), ang = Angle(-72, 8, 0) },
+			{ key = "secondary", pos = Vector(-72, 36, 22), ang = Angle(-70, -12, 0) },
+		}
+		for _, l in ipairs(lean) do
+			local it = SCPArmory.GetItem(l.key, selection[l.key])
+			if HasModel(it) then
+				AddSceneProp(it.model, l.pos, l.ang, 0.7)
+			end
+		end
+	end
+
+	local function BuildWeaponScene()
+		ClearScene()
+		if not SceneEnabled() then return end
+
+		local c, size = preview.WepCenter, preview.WepSize
+		if not c then return end
+
+		-- La caisse d'armes sous l'arme, tapis sombre en dessous
+		AddSceneProp("models/items/ammocrate_ar2.mdl", c + Vector(0, 0, -size * 0.52), Angle(0, 30, 0), 0.7)
+		AddSceneProp("models/hunter/plates/plate4x4.mdl", c + Vector(0, 0, -size * 0.62), Angle(0, 30, 0), 0.14)
+	end
+
 	frame.OnRemove = function()
 		ClearHeldWeapon()
 		ClearPreviewAtts()
+		ClearScene()
 	end
 
 	preview.PostDrawModel = function(s, ent)
+		-- Décor (z-testé, donc l'ordre n'a pas d'importance)
+		for _, p in ipairs(sceneProps) do
+			if IsValid(p) then
+				if p.Tint then render.SetColorModulation(p.Tint, p.Tint, p.Tint) end
+				p:DrawModel()
+				render.SetColorModulation(1, 1, 1)
+			end
+		end
+
 		if IsValid(s.HeldWep) then
 			s.HeldWep:DrawModel()
 		end
@@ -532,27 +620,32 @@ local function OpenMenu()
 				ShowPreview()
 				SetPreview(mdl, true)
 				BuildPreviewAtts(item)
+				BuildWeaponScene()
 				return
 			end
 			if item and item.icon then
+				ClearScene()
 				ShowImage(item.icon)
 				return
 			end
 			ShowPreview()
 		elseif mode == "select" and hoverItem then
 			if hoverItem.icon then
+				ClearScene()
 				ShowImage(hoverItem.icon)
 				return
 			end
 			if HasModel(hoverItem) then
 				ShowPreview()
 				SetPreview(hoverItem.model, true)
+				BuildWeaponScene()
 				return
 			end
 		end
 		ShowPreview()
 		SetPreview(plyModel, false)
 		DecorateOperator()
+		BuildOperatorScene()
 	end
 
 	SetPreview(plyModel, false)
