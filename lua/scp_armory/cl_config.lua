@@ -12,7 +12,8 @@ SCPArmory.ItemJobs = SCPArmory.ItemJobs or {}
 
 net.Receive("SCPArmory_Config", function()
 	local len = net.ReadUInt(16)
-	local data = util.JSONToTable(util.Decompress(net.ReadData(len) or "") or "")
+	-- Décompression plafonnée (défense en profondeur, même venant du serveur)
+	local data = util.JSONToTable(util.Decompress(net.ReadData(len) or "", 1048576) or "")
 	if not istable(data) then return end
 
 	if istable(data.config) then

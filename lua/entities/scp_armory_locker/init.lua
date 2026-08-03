@@ -3,7 +3,12 @@ AddCSLuaFile("cl_init.lua")
 include("shared.lua")
 
 function ENT:Initialize()
-	self:SetModel(SCPArmory.Config.LockerModel)
+	-- Modèle vérifié : un chemin invalide en config retombe sur le défaut
+	local mdl = SCPArmory.Config.LockerModel
+	if not (isstring(mdl) and util.IsValidModel(mdl)) then
+		mdl = "models/props_c17/FurnitureDrawer001a.mdl"
+	end
+	self:SetModel(mdl)
 	self:PhysicsInit(SOLID_VPHYSICS)
 	self:SetMoveType(MOVETYPE_VPHYSICS)
 	self:SetSolid(SOLID_VPHYSICS)

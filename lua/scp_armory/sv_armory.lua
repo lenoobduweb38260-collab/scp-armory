@@ -142,6 +142,8 @@ net.Receive("SCPArmory_Apply", function(_, ply)
 
 	for _, slot in ipairs(SCPArmory.Slots) do
 		local id = net.ReadString()
+		-- Chaînes bornées : un id fantaisiste géant est rejeté sans lookup
+		if #id > 64 then id = "none" end
 		local item = SCPArmory.GetItem(slot.pool, id)
 
 		if id == "none" or not item then
@@ -173,7 +175,7 @@ net.Receive("SCPArmory_Apply", function(_, ply)
 		if item and item.class and SCPArmory.ARC9Bridge.IsARC9Class(item.class) then
 			local clean = {}
 			for idx, attId in pairs(map) do
-				if SCPArmory.ARC9Bridge.IsCompatible(item.class, idx, attId) then
+				if #attId <= 96 and SCPArmory.ARC9Bridge.IsCompatible(item.class, idx, attId) then
 					clean[idx] = attId
 				end
 			end
@@ -246,6 +248,10 @@ end)
 hook.Add("PlayerSwitchWeapon", "SCPArmory_AttsOnSwitch", function(_, _, new)
 	if not IsValid(new) or not istable(new.SCPArmoryPendingAtts) then return end
 
+	-- Debounce : le spam de changement d'arme ne crée pas un timer par switch
+	if (new.SCPArmoryAttsCheck or 0) > CurTime() then return end
+	new.SCPArmoryAttsCheck = CurTime() + 1
+
 	local map = new.SCPArmoryPendingAtts
 	timer.Simple(0.15, function()
 		if not IsValid(new) then return end
@@ -286,38 +292,60 @@ local EDITABLE = {
 }
 
 -- Transforme "Job A, Job B" (ou une table) en liste propre de noms de jobs
+-- (bornée : 24 jobs max par objet, 64 caractères max par nom)
 local function ParseJobs(v)
 	local list = {}
 	if isstring(v) then
 		for part in string.gmatch(v, "[^,]+") do
 			part = string.Trim(part)
-			if part ~= "" then table.insert(list, part) end
+			if part ~= "" and #part <= 64 then table.insert(list, part) end
+			if #list >= 24 then break end
 		end
 	elseif istable(v) then
 		for _, part in ipairs(v) do
-			if isstring(part) and string.Trim(part) ~= "" then
+			if isstring(part) and #part <= 64 and string.Trim(part) ~= "" then
 				table.insert(list, string.Trim(part))
 			end
+			if #list >= 24 then break end
 		end
 	end
 	return list
 end
+
+-- Bornes de sécurité par option numérique (un superadmin compromis ne peut
+-- pas casser le serveur avec des valeurs absurdes)
+local NUM_BOUNDS = {
+	UseDistance     = { 32, 2048 },
+	PreviewDistance = { 40, 400 },
+	BaseWalkSpeed   = { 50, 1000 },
+	BaseRunSpeed    = { 50, 2000 },
+	MaxArmor        = { 1, 1000 },
+}
 
 local function ApplyOverrides(data)
 	if istable(data.config) then
 		for k, expected in pairs(EDITABLE) do
 			local v = data.config[k]
 			if type(v) == expected then
-				if expected == "number" then v = math.Clamp(v, 0, 100000) end
-				SCPArmory.Config[k] = v
+				if expected == "number" then
+					local b = NUM_BOUNDS[k]
+					v = b and math.Clamp(v, b[1], b[2]) or math.Clamp(v, 0, 100000)
+				elseif expected == "string" and #v > 260 then
+					v = nil
+				end
+				if v ~= nil then SCPArmory.Config[k] = v end
 			end
 		end
 	end
 
 	-- Icônes : stockées même si l'objet n'existe pas encore
-	-- (armes auto-chargées après le chargement de la config)
+	-- (armes auto-chargées après le chargement de la config).
+	-- Itérations plafonnées pour borner le CPU.
 	if istable(data.icons) then
+		local n = 0
 		for key, url in pairs(data.icons) do
+			n = n + 1
+			if n > 512 then break end
 			if isstring(key) and isstring(url) and #url < 300
 				and string.match(key, "^[%w_]+/[%w_]+$") then
 				if url == "" then
@@ -331,7 +359,10 @@ local function ApplyOverrides(data)
 
 	-- Restrictions par job, même principe
 	if istable(data.jobs) then
+		local n = 0
 		for key, v in pairs(data.jobs) do
+			n = n + 1
+			if n > 512 then break end
 			if isstring(key) and string.match(key, "^[%w_]+/[%w_]+$") then
 				local list = ParseJobs(v)
 				SCPArmory.ItemJobs[key] = (#list > 0) and list or nil
@@ -378,7 +409,8 @@ net.Receive("SCPArmory_SaveConfig", function(_, ply)
 	if not RateLimit(ply, "SCPArmoryRL_Save", 2) then return end
 
 	local len = net.ReadUInt(16)
-	local json = util.Decompress(net.ReadData(len) or "") or ""
+	-- Décompression plafonnée à 1 Mo : une « bombe » zlib est rejetée
+	local json = util.Decompress(net.ReadData(len) or "", 1048576) or ""
 	local data = util.JSONToTable(json)
 	if not istable(data) then return end
 

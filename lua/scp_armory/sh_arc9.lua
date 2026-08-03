@@ -97,12 +97,20 @@ function Bridge.GetCompatible(cats)
 end
 
 -- Validation serveur : cet accessoire va-t-il sur cet emplacement de cette arme ?
+-- Intersection directe des catégories (pas de parcours du registre complet :
+-- un client ne peut pas nous faire brûler du CPU avec des ids fantaisistes)
 function Bridge.IsCompatible(class, slotIndex, attId)
-	if not Bridge.GetAtt(attId) then return false end
+	local att = Bridge.GetAtt(attId)
+	if not istable(att) or att.Hidden or att.InvAtt then return false end
+
 	for _, slot in ipairs(Bridge.GetSlots(class)) do
 		if slot.index == slotIndex then
-			for _, entry in ipairs(Bridge.GetCompatible(slot.cats)) do
-				if entry.id == attId then return true end
+			local wanted = {}
+			for _, c in ipairs(slot.cats) do
+				wanted[string.lower(tostring(c))] = true
+			end
+			for _, ac in ipairs(ToTable(att.Category)) do
+				if wanted[string.lower(tostring(ac))] then return true end
 			end
 			return false
 		end
