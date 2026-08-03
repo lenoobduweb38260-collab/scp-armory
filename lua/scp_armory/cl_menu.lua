@@ -324,13 +324,14 @@ local function OpenMenu()
 		s:MouseCapture(false)
 	end
 
-	-- Caméra de l'arme : distance de base rapprochée + zoom à la molette
+	-- Caméra de l'arme : vue plongeante d'établi (l'arme posée sur la table),
+	-- zoom à la molette
 	local function UpdateWeaponCam()
 		local c, size = preview.WepCenter, preview.WepSize
 		if not c then return end
 		local d = size * 1.0 * (preview.zoom or 1)
 		preview:SetFOV(32)
-		preview:SetCamPos(c + Vector(-d * 0.38, d, d * 0.27))
+		preview:SetCamPos(c + Vector(-d * 0.30, d * 0.85, d * 0.55))
 		preview:SetLookAt(c)
 	end
 
@@ -400,36 +401,50 @@ local function OpenMenu()
 		return SCPArmory.Config.MenuScene ~= false
 	end
 
+	-- Allée d'armurerie : sol et murs sombres, râteliers remplis des armes
+	-- du pool le long des deux murs et du fond, caisses au coin
 	local function BuildOperatorScene()
 		ClearScene()
 		if not SceneEnabled() then return end
 
-		-- Sol sombre
-		AddSceneProp("models/hunter/plates/plate8x8.mdl", Vector(-30, 0, -1), Angle(0, 0, 0), 0.16)
+		-- Sol + murs
+		AddSceneProp("models/hunter/plates/plate8x8.mdl", Vector(-30, 0, -1), Angle(0, 0, 0), 0.15)
+		AddSceneProp("models/hunter/plates/plate8x8.mdl", Vector(-96, 0, 46), Angle(90, 0, 0), 0.10)
+		AddSceneProp("models/hunter/plates/plate8x8.mdl", Vector(-30, -78, 46), Angle(90, 90, 0), 0.10)
+		AddSceneProp("models/hunter/plates/plate8x8.mdl", Vector(-30, 78, 46), Angle(90, 90, 0), 0.10)
 
-		-- Mur d'armoires métalliques derrière l'opérateur
-		for i = -1, 1 do
-			AddSceneProp("models/props_c17/lockers001a.mdl", Vector(-88, i * 52, 0), Angle(0, 0, 0), 0.55)
+		-- Caisses au coin
+		AddSceneProp("models/props_junk/wood_crate001a.mdl", Vector(-64, 62, 0), Angle(0, 18, 0), 0.5)
+		AddSceneProp("models/props_junk/wood_crate001a.mdl", Vector(-66, 60, 34), Angle(0, 42, 0), 0.5)
+
+		-- Armes disponibles du pool, debout dans les râteliers
+		local guns = {}
+		for _, it in ipairs(SCPArmory.Items.primary) do
+			if it.id ~= "none" and HasModel(it) and SCPArmory.IsItemAvailable(LocalPlayer(), it) then
+				table.insert(guns, it.model)
+				if #guns >= 20 then break end
+			end
+		end
+		if #guns == 0 then return end
+
+		local slots = {}
+		for i = 0, 7 do -- râtelier du fond
+			table.insert(slots, { pos = Vector(-90, -42 + i * 12, 25), ang = Angle(-90, 0, 0) })
+		end
+		for i = 0, 5 do -- mur gauche
+			table.insert(slots, { pos = Vector(-70 + i * 13, -72, 25), ang = Angle(-90, 90, 0) })
+		end
+		for i = 0, 5 do -- mur droit
+			table.insert(slots, { pos = Vector(-70 + i * 13, 72, 25), ang = Angle(-90, -90, 0) })
 		end
 
-		-- Caisses empilées sur le côté
-		AddSceneProp("models/props_junk/wood_crate001a.mdl", Vector(-56, 82, 0), Angle(0, 18, 0), 0.6)
-		AddSceneProp("models/props_junk/wood_crate001a.mdl", Vector(-58, 80, 34), Angle(0, 42, 0), 0.6)
-		AddSceneProp("models/items/ammocrate_ar2.mdl", Vector(-52, -84, 0), Angle(0, -20, 0), 0.65)
-
-		-- Les armes du loadout adossées au râtelier, en fond
-		local lean = {
-			{ key = "primary", pos = Vector(-70, -34, 26), ang = Angle(-72, 8, 0) },
-			{ key = "secondary", pos = Vector(-72, 36, 22), ang = Angle(-70, -12, 0) },
-		}
-		for _, l in ipairs(lean) do
-			local it = SCPArmory.GetItem(l.key, selection[l.key])
-			if HasModel(it) then
-				AddSceneProp(it.model, l.pos, l.ang, 0.7)
-			end
+		for i, slot in ipairs(slots) do
+			AddSceneProp(guns[(i - 1) % #guns + 1], slot.pos, slot.ang, 0.55)
 		end
 	end
 
+	-- Établi d'atelier : l'arme posée sur une grande table sombre,
+	-- caisses de munitions éparpillées autour, façon Modern Warfare
 	local function BuildWeaponScene()
 		ClearScene()
 		if not SceneEnabled() then return end
@@ -437,9 +452,12 @@ local function OpenMenu()
 		local c, size = preview.WepCenter, preview.WepSize
 		if not c then return end
 
-		-- La caisse d'armes sous l'arme, tapis sombre en dessous
-		AddSceneProp("models/items/ammocrate_ar2.mdl", c + Vector(0, 0, -size * 0.52), Angle(0, 30, 0), 0.7)
-		AddSceneProp("models/hunter/plates/plate4x4.mdl", c + Vector(0, 0, -size * 0.62), Angle(0, 30, 0), 0.14)
+		AddSceneProp("models/hunter/plates/plate8x8.mdl", c + Vector(0, 0, -size * 0.16), Angle(0, 30, 0), 0.13)
+
+		AddSceneProp("models/items/boxsrounds.mdl", c + Vector(-size * 0.32, size * 0.30, -size * 0.14), Angle(0, 70, 0), 0.5)
+		AddSceneProp("models/items/boxmrounds.mdl", c + Vector(size * 0.30, size * 0.34, -size * 0.14), Angle(0, 15, 0), 0.5)
+		AddSceneProp("models/items/boxbuckshot.mdl", c + Vector(size * 0.38, -size * 0.22, -size * 0.14), Angle(0, -30, 0), 0.5)
+		AddSceneProp("models/items/ammocrate_ar2.mdl", c + Vector(-size * 0.44, -size * 0.40, -size * 0.16), Angle(0, 55, 0), 0.5)
 	end
 
 	frame.OnRemove = function()
