@@ -41,6 +41,10 @@ local COL = {
 local SAVE_DIR = "scp_armory"
 local SAVE_FILE = SAVE_DIR .. "/loadout.txt"
 
+-- Fonds d'ambiance (images générées, incluses dans l'addon)
+local MAT_RACKS = Material("scp_armory/bg_racks.png", "smooth")
+local MAT_TABLE = Material("scp_armory/bg_table.png", "smooth")
+
 local WEAPON_KEYS = { "primary", "secondary" }
 
 local activeMenu = nil
@@ -203,19 +207,36 @@ local function OpenMenu()
 
 	local openTime = RealTime()
 
+	-- Fonds d'ambiance générés, livrés dans materials/scp_armory :
+	-- râteliers d'armurerie derrière l'opérateur, établi sous l'arme
+	local bgWeapon = false -- écran arme (établi) ou opérateur (râteliers)
+	local bgBlend = 0
+
+	local function DrawBackdrop(mat, w, h, alpha)
+		if not mat or mat:IsError() then return end
+		local iw, ih = 1920, 1080
+		local scale = math.max(w / iw, h / ih)
+		local dw, dh = iw * scale, ih * scale
+		local u = (dw - w) / dw * 0.5
+		local v = (dh - h) / dh * 0.5
+		surface.SetDrawColor(255, 255, 255, alpha)
+		surface.SetMaterial(mat)
+		surface.DrawTexturedRectUV(0, 0, w, h, u, v, 1 - u, 1 - v)
+	end
+
 	frame.Paint = function(_, w, h)
 		surface.SetDrawColor(COL.bg)
 		surface.DrawRect(0, 0, w, h)
 
-		-- Grille technique très discrète derrière l'opérateur, dérive lente
-		local gx0 = math.floor(w * 0.30)
-		local drift = (RealTime() * 2.5) % 64
-		surface.SetDrawColor(255, 255, 255, 4)
-		for x = gx0 - drift, w, 64 do
-			surface.DrawRect(x, 0, 1, h)
-		end
-		for y = -drift, h, 64 do
-			surface.DrawRect(gx0, y, w - gx0, 1)
+		-- Fondu croisé râteliers <-> établi selon l'écran affiché
+		if SCPArmory.Config.MenuScene ~= false then
+			bgBlend = Lerp(FrameTime() * 6, bgBlend, bgWeapon and 1 or 0)
+			if bgBlend < 0.99 then
+				DrawBackdrop(MAT_RACKS, w, h, 255 * (1 - bgBlend))
+			end
+			if bgBlend > 0.01 then
+				DrawBackdrop(MAT_TABLE, w, h, 255 * bgBlend)
+			end
 		end
 
 		-- Dégradé sombre derrière la colonne pour la lisibilité, façon RoN
@@ -372,110 +393,12 @@ local function OpenMenu()
 		preview.AttModels = nil
 	end
 
-	-- ------------------------------------------------ décor 3D de l'aperçu
-	-- LOADOUT : armoires/casiers en fond, caisses empilées, armes du loadout
-	-- adossées au râtelier. MODIFIER L'ARME : l'arme au-dessus d'une caisse.
-
-	local sceneProps = {}
-
-	local function ClearScene()
-		for _, p in ipairs(sceneProps) do
-			if IsValid(p) then p:Remove() end
-		end
-		sceneProps = {}
-	end
-
-	local function AddSceneProp(mdl, pos, ang, tint)
-		if not (isstring(mdl) and file.Exists(mdl, "GAME")) then return end
-		local e = ClientsideModel(mdl, RENDERGROUP_OPAQUE)
-		if not IsValid(e) then return end
-		e:SetNoDraw(true)
-		e:SetPos(pos)
-		e:SetAngles(ang)
-		e.Tint = tint
-		table.insert(sceneProps, e)
-		return e
-	end
-
-	local function SceneEnabled()
-		return SCPArmory.Config.MenuScene ~= false
-	end
-
-	-- Allée d'armurerie : sol et murs sombres, râteliers remplis des armes
-	-- du pool le long des deux murs et du fond, caisses au coin
-	local function BuildOperatorScene()
-		ClearScene()
-		if not SceneEnabled() then return end
-
-		-- Sol + murs
-		AddSceneProp("models/hunter/plates/plate8x8.mdl", Vector(-30, 0, -1), Angle(0, 0, 0), 0.15)
-		AddSceneProp("models/hunter/plates/plate8x8.mdl", Vector(-96, 0, 46), Angle(90, 0, 0), 0.10)
-		AddSceneProp("models/hunter/plates/plate8x8.mdl", Vector(-30, -78, 46), Angle(90, 90, 0), 0.10)
-		AddSceneProp("models/hunter/plates/plate8x8.mdl", Vector(-30, 78, 46), Angle(90, 90, 0), 0.10)
-
-		-- Caisses au coin
-		AddSceneProp("models/props_junk/wood_crate001a.mdl", Vector(-64, 62, 0), Angle(0, 18, 0), 0.5)
-		AddSceneProp("models/props_junk/wood_crate001a.mdl", Vector(-66, 60, 34), Angle(0, 42, 0), 0.5)
-
-		-- Armes disponibles du pool, debout dans les râteliers
-		local guns = {}
-		for _, it in ipairs(SCPArmory.Items.primary) do
-			if it.id ~= "none" and HasModel(it) and SCPArmory.IsItemAvailable(LocalPlayer(), it) then
-				table.insert(guns, it.model)
-				if #guns >= 20 then break end
-			end
-		end
-		if #guns == 0 then return end
-
-		local slots = {}
-		for i = 0, 7 do -- râtelier du fond
-			table.insert(slots, { pos = Vector(-90, -42 + i * 12, 25), ang = Angle(-90, 0, 0) })
-		end
-		for i = 0, 5 do -- mur gauche
-			table.insert(slots, { pos = Vector(-70 + i * 13, -72, 25), ang = Angle(-90, 90, 0) })
-		end
-		for i = 0, 5 do -- mur droit
-			table.insert(slots, { pos = Vector(-70 + i * 13, 72, 25), ang = Angle(-90, -90, 0) })
-		end
-
-		for i, slot in ipairs(slots) do
-			AddSceneProp(guns[(i - 1) % #guns + 1], slot.pos, slot.ang, 0.55)
-		end
-	end
-
-	-- Établi d'atelier : l'arme posée sur une grande table sombre,
-	-- caisses de munitions éparpillées autour, façon Modern Warfare
-	local function BuildWeaponScene()
-		ClearScene()
-		if not SceneEnabled() then return end
-
-		local c, size = preview.WepCenter, preview.WepSize
-		if not c then return end
-
-		AddSceneProp("models/hunter/plates/plate8x8.mdl", c + Vector(0, 0, -size * 0.16), Angle(0, 30, 0), 0.13)
-
-		AddSceneProp("models/items/boxsrounds.mdl", c + Vector(-size * 0.32, size * 0.30, -size * 0.14), Angle(0, 70, 0), 0.5)
-		AddSceneProp("models/items/boxmrounds.mdl", c + Vector(size * 0.30, size * 0.34, -size * 0.14), Angle(0, 15, 0), 0.5)
-		AddSceneProp("models/items/boxbuckshot.mdl", c + Vector(size * 0.38, -size * 0.22, -size * 0.14), Angle(0, -30, 0), 0.5)
-		AddSceneProp("models/items/ammocrate_ar2.mdl", c + Vector(-size * 0.44, -size * 0.40, -size * 0.16), Angle(0, 55, 0), 0.5)
-	end
-
 	frame.OnRemove = function()
 		ClearHeldWeapon()
 		ClearPreviewAtts()
-		ClearScene()
 	end
 
 	preview.PostDrawModel = function(s, ent)
-		-- Décor (z-testé, donc l'ordre n'a pas d'importance)
-		for _, p in ipairs(sceneProps) do
-			if IsValid(p) then
-				if p.Tint then render.SetColorModulation(p.Tint, p.Tint, p.Tint) end
-				p:DrawModel()
-				render.SetColorModulation(1, 1, 1)
-			end
-		end
-
 		if IsValid(s.HeldWep) then
 			s.HeldWep:DrawModel()
 		end
@@ -520,6 +443,7 @@ local function OpenMenu()
 	end
 
 	local function SetPreview(mdl, isWeapon)
+		bgWeapon = isWeapon
 		if preview.CurModel == mdl and preview.CurIsWeapon == isWeapon then return end
 		preview.CurModel = mdl
 		preview.CurIsWeapon = isWeapon
@@ -657,32 +581,29 @@ local function OpenMenu()
 				ShowPreview()
 				SetPreview(mdl, true)
 				BuildPreviewAtts(item)
-				BuildWeaponScene()
 				return
 			end
 			if item and item.icon then
-				ClearScene()
+				bgWeapon = true
 				ShowImage(item.icon)
 				return
 			end
 			ShowPreview()
 		elseif mode == "select" and hoverItem then
 			if hoverItem.icon then
-				ClearScene()
+				bgWeapon = true
 				ShowImage(hoverItem.icon)
 				return
 			end
 			if HasModel(hoverItem) then
 				ShowPreview()
 				SetPreview(hoverItem.model, true)
-				BuildWeaponScene()
 				return
 			end
 		end
 		ShowPreview()
 		SetPreview(plyModel, false)
 		DecorateOperator()
-		BuildOperatorScene()
 	end
 
 	SetPreview(plyModel, false)

@@ -394,7 +394,7 @@ function SCPArmory.OpenConfigMenu()
 	AddCheck("RequireEntity", "N'autoriser le menu et le déploiement qu'à proximité d'une armoire d'armurerie")
 	AddCheck("BlockARC9Customize", "Désactiver le menu de personnalisation ARC9 (touche C) — accessoires via l'armurerie uniquement")
 	AddCheck("AutoLoadWeapons", "Charger automatiquement les armes des packs installés (ARC9, M9K…) — appliqué au prochain redémarrage")
-	AddCheck("MenuScene", "Décor 3D dans le menu : armoires et caisses derrière l'opérateur, caisse d'armes sous l'arme")
+	AddCheck("MenuScene", "Fond d'armurerie dans le menu : râteliers derrière l'opérateur, établi sous l'arme")
 	AddNumber("UseDistance", "Portée autour de l'armoire (unités)", 60, 512)
 
 	Section("JOURNAUX")
