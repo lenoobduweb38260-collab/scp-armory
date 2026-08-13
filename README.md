@@ -5,6 +5,7 @@ Addon **Garry's Mod** : une armurerie de la Fondation SCP qui recrée les écran
 opérateur (ou arme) en grand plan, accessoires **ARC9**, poids qui pénalise la mobilité,
 restrictions par job et **chargement automatique des packs d'armes installés**.
 
+![Écran LOADOUT — habillage cartes](docs/apercu-cartes.png)
 ![Écran LOADOUT](docs/apercu-loadout.png)
 ![Écran MODIFIER L'ARME](docs/apercu-modify.png)
 
