@@ -21,6 +21,8 @@ local COL = {
 
 local activeBG = nil
 
+local function T(s) return SCPArmory.T(s) end
+
 local function OpenBGMenu()
 	if IsValid(activeBG) then activeBG:Remove() end
 
@@ -52,13 +54,12 @@ local function OpenBGMenu()
 	frame:SetAlpha(0)
 	frame:AlphaTo(255, 0.15, 0)
 	frame.Paint = function(_, w, h)
-		draw.RoundedBox(4, 0, 0, w, h, COL.bg)
-		surface.SetDrawColor(COL.red)
-		surface.DrawRect(0, 0, w, 2)
-		draw.SimpleText("APPARENCE", "SCPArmory_BG_Title", 18, 14, COL.text)
-		draw.SimpleText("BODYGROUPS AUTORISÉS PAR LE SITE", "SCPArmory_BG_Small", 18, 42, COL.dim)
+		draw.RoundedBox(10, 0, 0, w, h, COL.bg)
+		draw.RoundedBoxEx(10, 0, 0, w, 3, COL.red, true, true, false, false)
+		draw.SimpleText(T("APPARENCE"), "SCPArmory_BG_Title", 18, 14, COL.text)
+		draw.SimpleText(T("BODYGROUPS AUTORISÉS PAR LE SITE"), "SCPArmory_BG_Small", 18, 42, COL.dim)
 		if #opts == 0 then
-			draw.SimpleText("Aucun bodygroup autorisé sur votre modèle.", "SCPArmory_BG_Small", 18, 74, COL.faint)
+			draw.SimpleText(T("Aucun bodygroup autorisé sur votre modèle."), "SCPArmory_BG_Small", 18, 74, COL.faint)
 		end
 	end
 
@@ -78,7 +79,7 @@ local function OpenBGMenu()
 		row:SetSize(W - 36, 40)
 		row.Paint = function(_, w, h)
 			draw.SimpleText(SCPArmory.FrUpper(opt.name), "SCPArmory_BG_Label", 0, 3, COL.dim)
-			draw.SimpleText("VARIANTE " .. (opt.val + 1) .. " / " .. opt.num, "SCPArmory_BG_Name", 0, 17, COL.soft)
+			draw.SimpleText(T("VARIANTE") .. " " .. (opt.val + 1) .. " / " .. opt.num, "SCPArmory_BG_Name", 0, 17, COL.soft)
 			surface.SetDrawColor(COL.line)
 			surface.DrawRect(0, h - 1, w, 1)
 		end
@@ -109,9 +110,8 @@ local function OpenBGMenu()
 	applyBtn:SetSize(W - 36, 38)
 	applyBtn:SetText("")
 	applyBtn.Paint = function(s, w, h)
-		surface.SetDrawColor(s:IsHovered() and COL.redHi or COL.red)
-		surface.DrawRect(0, 0, w, h)
-		draw.SimpleText("APPLIQUER", "SCPArmory_BG_Label", w / 2, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.RoundedBox(8, 0, 0, w, h, s:IsHovered() and COL.redHi or COL.red)
+		draw.SimpleText(T("APPLIQUER"), "SCPArmory_BG_Label", w / 2, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
 	applyBtn.DoClick = function()
 		net.Start("SCPArmory_ApplyBG")

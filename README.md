@@ -40,6 +40,11 @@ restrictions par job et **chargement automatique des packs d'armes installés**.
   catégorie *SCP Armory*, modèle configurable), étiquette 3D2D « ARMURERIE — Appuyez sur [E] ».
   Avec `RequireEntity = true`, s'équiper n'est possible **qu'à proximité d'une armoire**.
 - **Sauvegarde locale** du dernier loadout + réapplication optionnelle au respawn.
+- **Interface en 3 langues** : français (défaut), **allemand** et **polonais**. La langue se choisit
+  dans le panneau de configuration (section GÉNÉRAL) et s'applique en direct à tous les joueurs :
+  menu, notifications, menu d'apparence et étiquette 3D2D de l'armoire.
+- **Habillage « cartes »** : colonne et panneaux sur cartes translucides arrondies, lignes
+  d'équipement en cartes espacées, boutons arrondis, barre d'accent en dégradé rouge → ambre.
 
 ## Installation
 

@@ -50,6 +50,9 @@ SCPArmory.Config = {
 	-- l'opérateur, caisse d'armes sous l'arme en personnalisation
 	MenuScene = true,
 
+	-- Langue de l'interface : "fr", "de" ou "pl" (choix dans la config en jeu)
+	Language = "fr",
+
 	-- Séquence de pose de l'opérateur dans le menu (bras croisés si dispo)
 	PreviewPose = "pose_standing_02",
 

@@ -1,0 +1,158 @@
+-- SCP Armory — traductions (français par défaut, allemand, polonais)
+-- Les clés sont les chaînes françaises d'origine : toute clé manquante
+-- retombe sur le français. Langue choisie dans le panneau de configuration
+-- (Config.Language = "fr" / "de" / "pl"), diffusée à tous les joueurs.
+
+SCPArmory = SCPArmory or {}
+
+SCPArmory.Translations = {
+	de = {
+		["ARME PRINCIPALE"] = "PRIMÄRWAFFE",
+		["ARME SECONDAIRE"] = "SEKUNDÄRWAFFE",
+		["TACTIQUE I"] = "TAKTISCH I",
+		["TACTIQUE II"] = "TAKTISCH II",
+		["GRENADE"] = "GRANATE",
+		["GILET BALISTIQUE"] = "SCHUTZWESTE",
+		["CASQUE"] = "HELM",
+		["ARMEMENT"] = "BEWAFFNUNG",
+		["PROTECTION"] = "SCHUTZ",
+		["APPARENCE"] = "AUSSEHEN",
+		["PRÉPARATION AU DÉPLOIEMENT"] = "EINSATZVORBEREITUNG",
+		["MODIFIER L'ARME"] = "WAFFE ANPASSEN",
+		["CHOIX D'ACCESSOIRE"] = "AUFSATZ WÄHLEN",
+		["SÉLECTION D'ÉQUIPEMENT"] = "AUSRÜSTUNG WÄHLEN",
+		["APPARENCE DE L'OPÉRATEUR"] = "AUSSEHEN DES OPERATORS",
+		["— AUCUN —"] = "— KEINE —",
+		["— AUCUNE —"] = "— KEINE —",
+		["CHANGER D'ARME"] = "WAFFE WECHSELN",
+		["—  VIDE  —"] = "—  LEER  —",
+		["RETIRER TOUS LES ACCESSOIRES"] = "ALLE AUFSÄTZE ENTFERNEN",
+		["SÉLECTIONNEZ D'ABORD UNE ARME"] = "WÄHLEN SIE ZUERST EINE WAFFE",
+		["ARME NON ARC9 — AUCUN ACCESSOIRE DISPONIBLE"] = "KEINE ARC9-WAFFE — KEINE AUFSÄTZE VERFÜGBAR",
+		["CETTE ARME N'A AUCUN EMPLACEMENT D'ACCESSOIRE"] = "DIESE WAFFE HAT KEINE AUFSATZPLÄTZE",
+		["AUCUN EMPLACEMENT D'ACCESSOIRE"] = "KEINE AUFSATZPLÄTZE",
+		["—  AUCUN  —"] = "—  KEINE  —",
+		["CONFIGURATION"] = "KONFIGURATION",
+		["AUCUN ACCESSOIRE ARC9 COMPATIBLE INSTALLÉ"] = "KEIN KOMPATIBLER ARC9-AUFSATZ INSTALLIERT",
+		["ACCESSOIRES"] = "AUFSÄTZE",
+		["AUCUNE ARME SÉLECTIONNÉE"] = "KEINE WAFFE AUSGEWÄHLT",
+		["ARME NON ARC9 — PAS DE RAIL"] = "KEINE ARC9-WAFFE — KEINE SCHIENE",
+		["PRINCIPALE"] = "PRIMÄR",
+		["SECONDAIRE"] = "SEKUNDÄR",
+		["‹  RETOUR"] = "‹  ZURÜCK",
+		["RETOUR"] = "ZURÜCK",
+		["DÉPLOYER"] = "EINSETZEN",
+		["Réappliquer ce chargement au respawn"] = "Diese Ausrüstung beim Respawn erneut anwenden",
+		["CHARGEMENT"] = "BELADUNG",
+		["POIDS"] = "GEWICHT",
+		["MOBILITÉ"] = "MOBILITÄT",
+		["ARMURE"] = "PANZERUNG",
+		["LÉGER"] = "LEICHT",
+		["INTERMÉDIAIRE"] = "MITTEL",
+		["LOURD"] = "SCHWER",
+		["DÉGÂTS"] = "SCHADEN",
+		["CADENCE"] = "FEUERRATE",
+		["CONTRÔLE"] = "KONTROLLE",
+		["PRÉCISION"] = "PRÄZISION",
+		["VARIANTE"] = "VARIANTE",
+		["ÉQUIPÉE"] = "AUSGERÜSTET",
+		["GLISSER : PIVOTER   ·   MOLETTE : ZOOM   ·   CLIC MOLETTE : DÉPLACER"]
+			= "ZIEHEN: DREHEN   ·   MAUSRAD: ZOOM   ·   MITTLERE TASTE: BEWEGEN",
+		["BODYGROUPS AUTORISÉS PAR LE SITE"] = "VOM STANDORT ERLAUBTE BODYGROUPS",
+		["Aucun bodygroup autorisé sur votre modèle."] = "Kein erlaubtes Bodygroup auf Ihrem Modell.",
+		["APPLIQUER"] = "ANWENDEN",
+		["ARMURERIE"] = "WAFFENKAMMER",
+		["Fondation SCP — Appuyez sur [E]"] = "SCP-Stiftung — Drücken Sie [E]",
+		["Chargement déployé — %.1f kg, mobilité %d%% (%s), armure %d."]
+			= "Ausrüstung eingesetzt — %.1f kg, Mobilität %d%% (%s), Panzerung %d.",
+		["Certains objets ne sont pas autorisés pour votre métier et ont été retirés."]
+			= "Einige Gegenstände sind für Ihren Beruf nicht erlaubt und wurden entfernt.",
+		["Vous devez être à proximité d'une armoire d'armurerie pour vous équiper."]
+			= "Sie müssen sich in der Nähe eines Waffenschranks befinden, um sich auszurüsten.",
+		["Rendez-vous à une armoire d'armurerie pour accéder à votre équipement."]
+			= "Gehen Sie zu einem Waffenschrank, um auf Ihre Ausrüstung zuzugreifen.",
+		["Le panneau de configuration est réservé aux superadmins."]
+			= "Das Konfigurationsmenü ist Superadmins vorbehalten.",
+		["Configuration enregistrée et diffusée à tous les joueurs."]
+			= "Konfiguration gespeichert und an alle Spieler gesendet.",
+	},
+
+	pl = {
+		["ARME PRINCIPALE"] = "BROŃ GŁÓWNA",
+		["ARME SECONDAIRE"] = "BROŃ BOCZNA",
+		["TACTIQUE I"] = "TAKTYCZNE I",
+		["TACTIQUE II"] = "TAKTYCZNE II",
+		["GRENADE"] = "GRANAT",
+		["GILET BALISTIQUE"] = "KAMIZELKA KULOODPORNA",
+		["CASQUE"] = "HEŁM",
+		["ARMEMENT"] = "UZBROJENIE",
+		["PROTECTION"] = "OCHRONA",
+		["APPARENCE"] = "WYGLĄD",
+		["PRÉPARATION AU DÉPLOIEMENT"] = "PRZYGOTOWANIE DO AKCJI",
+		["MODIFIER L'ARME"] = "MODYFIKUJ BROŃ",
+		["CHOIX D'ACCESSOIRE"] = "WYBÓR DODATKU",
+		["SÉLECTION D'ÉQUIPEMENT"] = "WYBÓR WYPOSAŻENIA",
+		["APPARENCE DE L'OPÉRATEUR"] = "WYGLĄD OPERATORA",
+		["— AUCUN —"] = "— BRAK —",
+		["— AUCUNE —"] = "— BRAK —",
+		["CHANGER D'ARME"] = "ZMIEŃ BROŃ",
+		["—  VIDE  —"] = "—  PUSTE  —",
+		["RETIRER TOUS LES ACCESSOIRES"] = "USUŃ WSZYSTKIE DODATKI",
+		["SÉLECTIONNEZ D'ABORD UNE ARME"] = "NAJPIERW WYBIERZ BROŃ",
+		["ARME NON ARC9 — AUCUN ACCESSOIRE DISPONIBLE"] = "BROŃ SPOZA ARC9 — BRAK DOSTĘPNYCH DODATKÓW",
+		["CETTE ARME N'A AUCUN EMPLACEMENT D'ACCESSOIRE"] = "TA BROŃ NIE MA GNIAZD NA DODATKI",
+		["AUCUN EMPLACEMENT D'ACCESSOIRE"] = "BRAK GNIAZD NA DODATKI",
+		["—  AUCUN  —"] = "—  BRAK  —",
+		["CONFIGURATION"] = "KONFIGURACJA",
+		["AUCUN ACCESSOIRE ARC9 COMPATIBLE INSTALLÉ"] = "BRAK ZGODNEGO DODATKU ARC9",
+		["ACCESSOIRES"] = "DODATKI",
+		["AUCUNE ARME SÉLECTIONNÉE"] = "NIE WYBRANO BRONI",
+		["ARME NON ARC9 — PAS DE RAIL"] = "BROŃ SPOZA ARC9 — BRAK SZYNY",
+		["PRINCIPALE"] = "GŁÓWNA",
+		["SECONDAIRE"] = "BOCZNA",
+		["‹  RETOUR"] = "‹  POWRÓT",
+		["RETOUR"] = "POWRÓT",
+		["DÉPLOYER"] = "DO AKCJI",
+		["Réappliquer ce chargement au respawn"] = "Zastosuj to wyposażenie ponownie po odrodzeniu",
+		["CHARGEMENT"] = "OBCIĄŻENIE",
+		["POIDS"] = "WAGA",
+		["MOBILITÉ"] = "MOBILNOŚĆ",
+		["ARMURE"] = "PANCERZ",
+		["LÉGER"] = "LEKKIE",
+		["INTERMÉDIAIRE"] = "ŚREDNIE",
+		["LOURD"] = "CIĘŻKIE",
+		["DÉGÂTS"] = "OBRAŻENIA",
+		["CADENCE"] = "SZYBKOSTRZELNOŚĆ",
+		["CONTRÔLE"] = "KONTROLA",
+		["PRÉCISION"] = "CELNOŚĆ",
+		["VARIANTE"] = "WARIANT",
+		["ÉQUIPÉE"] = "ZAŁOŻONY",
+		["GLISSER : PIVOTER   ·   MOLETTE : ZOOM   ·   CLIC MOLETTE : DÉPLACER"]
+			= "PRZECIĄGNIJ: OBRÓT   ·   KÓŁKO: ZOOM   ·   ŚRODKOWY PRZYCISK: PRZESUŃ",
+		["BODYGROUPS AUTORISÉS PAR LE SITE"] = "BODYGROUPS DOZWOLONE PRZEZ PLACÓWKĘ",
+		["Aucun bodygroup autorisé sur votre modèle."] = "Brak dozwolonych bodygroups na Twoim modelu.",
+		["APPLIQUER"] = "ZASTOSUJ",
+		["ARMURERIE"] = "ZBROJOWNIA",
+		["Fondation SCP — Appuyez sur [E]"] = "Fundacja SCP — Naciśnij [E]",
+		["Chargement déployé — %.1f kg, mobilité %d%% (%s), armure %d."]
+			= "Wyposażenie wydane — %.1f kg, mobilność %d%% (%s), pancerz %d.",
+		["Certains objets ne sont pas autorisés pour votre métier et ont été retirés."]
+			= "Niektóre przedmioty nie są dozwolone dla Twojej profesji i zostały usunięte.",
+		["Vous devez être à proximité d'une armoire d'armurerie pour vous équiper."]
+			= "Musisz być w pobliżu szafy zbrojowni, aby się wyposażyć.",
+		["Rendez-vous à une armoire d'armurerie pour accéder à votre équipement."]
+			= "Udaj się do szafy zbrojowni, aby uzyskać dostęp do wyposażenia.",
+		["Le panneau de configuration est réservé aux superadmins."]
+			= "Panel konfiguracji jest zarezerwowany dla superadminów.",
+		["Configuration enregistrée et diffusée à tous les joueurs."]
+			= "Konfiguracja zapisana i rozesłana do wszystkich graczy.",
+	},
+}
+
+-- Traduction d'une chaîne française vers la langue configurée
+function SCPArmory.T(s)
+	local lang = SCPArmory.Config and SCPArmory.Config.Language or "fr"
+	if lang == "fr" then return s end
+	local t = SCPArmory.Translations[lang]
+	return (t and t[s]) or s
+end

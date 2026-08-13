@@ -126,8 +126,8 @@ function SCPArmory.Apply(ply, loadout)
 		timer.Simple(0.9, ApplyAtts)
 	end
 
-	Notify(ply, string.format("Chargement déployé — %.1f kg, mobilité %d%% (%s), armure %d.",
-		stats.weight, stats.mobility, stats.class, stats.armor))
+	Notify(ply, string.format(SCPArmory.T("Chargement déployé — %.1f kg, mobilité %d%% (%s), armure %d."),
+		stats.weight, stats.mobility, SCPArmory.T(stats.class), stats.armor))
 end
 
 -- Réception du loadout choisi par le client
@@ -135,7 +135,7 @@ net.Receive("SCPArmory_Apply", function(_, ply)
 	if not RateLimit(ply, "SCPArmoryRL_Apply", 1.5) then return end
 
 	if SCPArmory.Config.RequireEntity and not SCPArmory.NearLocker(ply) then
-		Notify(ply, "Vous devez être à proximité d'une armoire d'armurerie pour vous équiper.")
+		Notify(ply, SCPArmory.T("Vous devez être à proximité d'une armoire d'armurerie pour vous équiper."))
 		return
 	end
 
@@ -203,7 +203,7 @@ net.Receive("SCPArmory_Apply", function(_, ply)
 	SCPArmory.AutoFlag[sid] = autoApply
 
 	if refused then
-		Notify(ply, "Certains objets ne sont pas autorisés pour votre métier et ont été retirés.")
+		Notify(ply, SCPArmory.T("Certains objets ne sont pas autorisés pour votre métier et ont été retirés."))
 		SCPArmory.AddLog("REFUS", SCPArmory.PlayerTag(ply)
 			.. " a tenté d'équiper des objets non autorisés pour son métier ["
 			.. (team.GetName(ply:Team()) or "?") .. "]", ply)
@@ -249,7 +249,7 @@ hook.Add("PlayerSay", "SCPArmory_ChatCommand", function(ply, text)
 	for _, cmd in ipairs(SCPArmory.Config.ChatCommands) do
 		if lowered == cmd then
 			if SCPArmory.Config.RequireEntity and not SCPArmory.NearLocker(ply) then
-				Notify(ply, "Rendez-vous à une armoire d'armurerie pour accéder à votre équipement.")
+				Notify(ply, SCPArmory.T("Rendez-vous à une armoire d'armurerie pour accéder à votre équipement."))
 			else
 				net.Start("SCPArmory_Open")
 				net.Send(ply)
@@ -264,7 +264,7 @@ hook.Add("PlayerSay", "SCPArmory_ChatCommand", function(ply, text)
 				net.Start("SCPArmory_OpenConfig")
 				net.Send(ply)
 			else
-				Notify(ply, "Le panneau de configuration est réservé aux superadmins.")
+				Notify(ply, SCPArmory.T("Le panneau de configuration est réservé aux superadmins."))
 			end
 			return ""
 		end
@@ -363,7 +363,11 @@ local EDITABLE = {
 	BaseRunSpeed       = "number",
 	MaxArmor           = "number",
 	LockerModel        = "string",
+	Language           = "string",
 }
+
+-- Langues d'interface disponibles (sh_lang.lua)
+local VALID_LANGS = { fr = true, de = true, pl = true }
 
 -- Transforme "Job A, Job B" (ou une table) en liste propre de noms de jobs
 -- (bornée : 24 jobs max par objet, 64 caractères max par nom)
@@ -411,6 +415,11 @@ local function ApplyOverrides(data)
 				if v ~= nil then SCPArmory.Config[k] = v end
 			end
 		end
+	end
+
+	-- La langue ne peut être qu'une des langues traduites
+	if not VALID_LANGS[SCPArmory.Config.Language] then
+		SCPArmory.Config.Language = "fr"
 	end
 
 	-- Icônes : stockées même si l'objet n'existe pas encore
@@ -524,7 +533,7 @@ net.Receive("SCPArmory_SaveConfig", function(_, ply)
 	ApplyOverrides(data)
 	SaveConfigToDisk()
 	SendConfig()
-	Notify(ply, "Configuration enregistrée et diffusée à tous les joueurs.")
+	Notify(ply, SCPArmory.T("Configuration enregistrée et diffusée à tous les joueurs."))
 
 	local changes = {}
 	for k in pairs(EDITABLE) do

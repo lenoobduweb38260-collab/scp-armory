@@ -133,9 +133,8 @@ function SCPArmory.OpenConfigMenu()
 	frame:SetAlpha(0)
 	frame:AlphaTo(255, 0.15, 0)
 	frame.Paint = function(_, w, h)
-		draw.RoundedBox(4, 0, 0, w, h, COL.bg)
-		surface.SetDrawColor(COL.red)
-		surface.DrawRect(0, 0, w, 2)
+		draw.RoundedBox(10, 0, 0, w, h, COL.bg)
+		draw.RoundedBoxEx(10, 0, 0, w, 3, COL.red, true, true, false, false)
 		draw.SimpleText("CONFIGURATION DE L'ARMURERIE", "SCPArmory_Cfg_Title", 20, 16, COL.text)
 		draw.SimpleText("SUPERADMIN — SAUVEGARDÉE CÔTÉ SERVEUR ET DIFFUSÉE À TOUS", "SCPArmory_Cfg_Small", 20, 44, COL.dim)
 	end
@@ -406,6 +405,54 @@ function SCPArmory.OpenConfigMenu()
 	AddCheck("MenuScene", "Fond d'armurerie dans le menu : râteliers derrière l'opérateur, établi sous l'arme")
 	AddNumber("UseDistance", "Portée autour de l'armoire (unités)", 60, 512)
 
+	-- Langue de l'interface : appliquée à tous les joueurs (menu, notifications,
+	-- étiquette de l'armoire) dès l'enregistrement de la configuration
+	local langSel = SCPArmory.Config.Language or "fr"
+	do
+		local LANGS = {
+			{ code = "fr", label = "FRANÇAIS" },
+			{ code = "de", label = "DEUTSCH" },
+			{ code = "pl", label = "POLSKI" },
+		}
+
+		local pnl = scroll:Add("DPanel")
+		pnl:Dock(TOP)
+		pnl:DockMargin(0, 10, 12, 0)
+		pnl:SetTall(28)
+		pnl.Paint = function(_, _, h)
+			draw.SimpleText("Langue de l'interface (tous les joueurs)", "SCPArmory_Cfg_Small",
+				0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		end
+
+		local btns = {}
+		for i, lang in ipairs(LANGS) do
+			local b = vgui.Create("DButton", pnl)
+			b:SetText("")
+			b.Paint = function(s, w, h)
+				local on = (langSel == lang.code)
+				draw.RoundedBox(6, 0, 0, w, h, on and COL.red or COL.field)
+				if not on then
+					surface.SetDrawColor(s:IsHovered() and COL.text or COL.line)
+					surface.DrawOutlinedRect(0, 0, w, h, 1)
+				end
+				draw.SimpleText(lang.label, "SCPArmory_Cfg_Small", w / 2, h / 2,
+					on and COL.text or COL.soft, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			end
+			b.DoClick = function()
+				langSel = lang.code
+				surface.PlaySound("ui/buttonclick.wav")
+			end
+			btns[i] = b
+		end
+
+		pnl.PerformLayout = function(_, w)
+			for i, b in ipairs(btns) do
+				b:SetSize(104, 24)
+				b:SetPos(w - (#btns - i + 1) * 110, 2)
+			end
+		end
+	end
+
 	Section("JOURNAUX")
 	AddCheck("LogToFile", "Écrire les logs dans data/scp_armory/logs/ (un fichier par jour)")
 	AddCheck("LogToConsole", "Afficher les logs dans la console serveur")
@@ -568,8 +615,7 @@ function SCPArmory.OpenConfigMenu()
 	saveBtn:SetSize(260, 38)
 	saveBtn:SetText("")
 	saveBtn.Paint = function(s, w, h)
-		surface.SetDrawColor(s:IsHovered() and COL.redHi or COL.red)
-		surface.DrawRect(0, 0, w, h)
+		draw.RoundedBox(8, 0, 0, w, h, s:IsHovered() and COL.redHi or COL.red)
 		draw.SimpleText("ENREGISTRER ET DIFFUSER", "SCPArmory_Cfg_Label", w / 2, h / 2,
 			COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
@@ -583,6 +629,7 @@ function SCPArmory.OpenConfigMenu()
 			payload.config[key] = slider:GetValue()
 		end
 		payload.config.LockerModel = lockerEntry:GetValue()
+		payload.config.Language = langSel
 
 		for key, entry in pairs(iconEntries) do
 			local url = string.Trim(entry:GetValue() or "")

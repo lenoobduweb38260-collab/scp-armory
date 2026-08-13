@@ -35,8 +35,16 @@ local COL = {
 	redHi  = Color(225, 52, 44, 255),
 	line   = Color(70, 70, 75, 180),
 	lineF  = Color(42, 42, 46, 160),
-	panel  = Color(10, 10, 13, 200),
+	panel  = Color(10, 10, 13, 216),
+	card   = Color(13, 13, 17, 216),
+	amber  = Color(255, 176, 0, 255),
 }
+
+-- Couleurs mutables réutilisées dans les Paint (aucune allocation par frame)
+local rowBG = Color(255, 255, 255, 8)
+local btnBG = Color(190, 34, 28, 255)
+local flashBG = Color(255, 255, 255, 255)
+local backBG = Color(255, 255, 255, 20)
 
 local SAVE_DIR = "scp_armory"
 local SAVE_FILE = SAVE_DIR .. "/loadout.txt"
@@ -48,6 +56,9 @@ local MAT_TABLE = Material("scp_armory/bg_table.png", "smooth")
 local WEAPON_KEYS = { "primary", "secondary" }
 
 local activeMenu = nil
+
+-- Traduction (français par défaut, allemand/polonais selon la config serveur)
+local function T(s) return SCPArmory.T(s) end
 
 -- ------------------------------------------------------------------- helpers
 
@@ -262,6 +273,18 @@ local function OpenMenu()
 	frame.PaintOver = function(_, w, h)
 		local rt = RealTime()
 
+		-- Barre d'accent en dégradé rouge → ambre en haut de l'écran
+		local bands = 40
+		local bw = w / bands
+		for i = 0, bands - 1 do
+			local f = i / (bands - 1)
+			surface.SetDrawColor(
+				Lerp(f, COL.red.r, COL.amber.r),
+				Lerp(f, COL.red.g, COL.amber.g),
+				Lerp(f, COL.red.b, COL.amber.b), 230)
+			surface.DrawRect(i * bw, 0, math.ceil(bw), 3)
+		end
+
 		-- Vignette cinématique haut/bas
 		local vh = 80
 		for i = 0, 7 do
@@ -302,7 +325,7 @@ local function OpenMenu()
 
 		-- Aide caméra sur l'écran de l'arme
 		if mode == "modify" or mode == "attselect" then
-			draw.SimpleText("GLISSER : PIVOTER   ·   MOLETTE : ZOOM   ·   CLIC MOLETTE : DÉPLACER",
+			draw.SimpleText(T("GLISSER : PIVOTER   ·   MOLETTE : ZOOM   ·   CLIC MOLETTE : DÉPLACER"),
 				"SCPArmory_RoN_Small", w * 0.63, h - 40, COL.faint, TEXT_ALIGN_CENTER)
 		end
 
@@ -699,9 +722,9 @@ local function OpenMenu()
 		cfgBtn:SetSize(150, 26)
 		cfgBtn:SetText("")
 		cfgBtn.Paint = function(s, w, h)
-			surface.SetDrawColor(s:IsHovered() and COL.text or COL.line)
-			surface.DrawOutlinedRect(0, 0, w, h, 1)
-			draw.SimpleText("CONFIGURATION", "SCPArmory_RoN_Label", w / 2, h / 2,
+			rowBG.a = s:IsHovered() and 44 or 22
+			draw.RoundedBox(6, 0, 0, w, h, rowBG)
+			draw.SimpleText(T("CONFIGURATION"), "SCPArmory_RoN_Label", w / 2, h / 2,
 				s:IsHovered() and COL.text or COL.dim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 		cfgBtn.DoClick = function()
@@ -725,6 +748,13 @@ local function OpenMenu()
 	local redAnim = Color(COL.red.r, COL.red.g, COL.red.b, 255)
 
 	column.Paint = function(s, w)
+		-- Carte translucide arrondie derrière toute la colonne, avec un
+		-- liseré d'accent en dégradé sur le bord supérieur (style « carte »)
+		local dc = DisableClipping(true)
+		draw.RoundedBox(14, -18, -16, w + 34, s:GetTall() + 32, COL.card)
+		draw.RoundedBoxEx(14, -18, -16, w + 34, 4, COL.red, true, true, false, false)
+		DisableClipping(dc)
+
 		-- Balayage animé du titre à chaque changement d'écran
 		local tf = Ease((RealTime() - (s.animT or 0)) / 0.35)
 		redAnim.a = 255 * tf
@@ -735,23 +765,23 @@ local function OpenMenu()
 			DrawSpacedText("LOADOUT", "SCPArmory_RoN_Huge", 0, 0, COL.text, 8)
 			surface.SetDrawColor(COL.red)
 			surface.DrawRect(0, 62, barW, 3)
-			DrawSpacedText("PRÉPARATION AU DÉPLOIEMENT", "SCPArmory_RoN_Label", 28, 58, redCol, 2)
+			DrawSpacedText(T("PRÉPARATION AU DÉPLOIEMENT"), "SCPArmory_RoN_Label", 28, 58, redCol, 2)
 			draw.SimpleText(SCPArmory.FrUpper(jobName) .. " — " .. LocalPlayer():Nick(), "SCPArmory_RoN_NameSm", 0, 82, COL.text)
 		elseif mode == "modify" or mode == "attselect" then
 			local item = CurWeaponItem()
-			DrawSpacedText(SCPArmory.FrUpper(item and item.name or "— AUCUNE —"), "SCPArmory_RoN_Big", 0, 8, COL.text, 3)
+			DrawSpacedText(SCPArmory.FrUpper(item and item.name or T("— AUCUNE —")), "SCPArmory_RoN_Big", 0, 8, COL.text, 3)
 			surface.SetDrawColor(COL.red)
 			surface.DrawRect(0, 52, barW, 3)
-			DrawSpacedText(mode == "modify" and "MODIFIER L'ARME" or "CHOIX D'ACCESSOIRE",
+			DrawSpacedText(mode == "modify" and T("MODIFIER L'ARME") or T("CHOIX D'ACCESSOIRE"),
 				"SCPArmory_RoN_Label", 28, 48, redCol, 2)
-			draw.SimpleText(SlotByKey(curWeaponKey).label, "SCPArmory_RoN_Label", 0, 82, COL.dim)
+			draw.SimpleText(T(SlotByKey(curWeaponKey).label), "SCPArmory_RoN_Label", 0, 82, COL.dim)
 		else
 			local title = (mode == "bgselect") and SCPArmory.FrUpper(bgSlot and bgSlot.name or "")
-				or (selectSlot and selectSlot.label or "")
+				or (selectSlot and T(selectSlot.label) or "")
 			DrawSpacedText(title, "SCPArmory_RoN_Big", 0, 8, COL.text, 3)
 			surface.SetDrawColor(COL.red)
 			surface.DrawRect(0, 52, barW, 3)
-			DrawSpacedText(mode == "bgselect" and "APPARENCE DE L'OPÉRATEUR" or "SÉLECTION D'ÉQUIPEMENT",
+			DrawSpacedText(mode == "bgselect" and T("APPARENCE DE L'OPÉRATEUR") or T("SÉLECTION D'ÉQUIPEMENT"),
 				"SCPArmory_RoN_Label", 28, 48, redCol, 2)
 		end
 
@@ -805,21 +835,19 @@ local function OpenMenu()
 	infoDesc:SetMouseInputEnabled(false)
 
 	infoPanel.Paint = function(_, w, h)
-		surface.SetDrawColor(COL.panel)
-		surface.DrawRect(0, 0, w, h)
-		surface.SetDrawColor(COL.red)
-		surface.DrawRect(0, 0, w, 2)
+		draw.RoundedBox(12, 0, 0, w, h, COL.panel)
+		draw.RoundedBoxEx(12, 0, 0, w, 3, COL.red, true, true, false, false)
 
 		local item = CurWeaponItem()
 		if not item then
-			draw.SimpleText("AUCUNE ARME SÉLECTIONNÉE", "SCPArmory_RoN_Label", 16, 16, COL.faint)
+			draw.SimpleText(T("AUCUNE ARME SÉLECTIONNÉE"), "SCPArmory_RoN_Label", 16, 16, COL.faint)
 			return
 		end
 
-		draw.SimpleText(SlotByKey(curWeaponKey).label, "SCPArmory_RoN_Label", 16, 14, COL.red)
+		draw.SimpleText(T(SlotByKey(curWeaponKey).label), "SCPArmory_RoN_Label", 16, 14, COL.red)
 		DrawSpacedText(SCPArmory.FrUpper(item.name), "SCPArmory_RoN_Name", 16, 30, COL.text, 1)
 
-		DrawSpacedText("ACCESSOIRES", "SCPArmory_RoN_Label", 16, 148, COL.dim, 2)
+		DrawSpacedText(T("ACCESSOIRES"), "SCPArmory_RoN_Label", 16, 148, COL.dim, 2)
 		surface.SetDrawColor(COL.line)
 		surface.DrawRect(16, 166, w - 32, 1)
 
@@ -827,7 +855,7 @@ local function OpenMenu()
 		if item.class and SCPArmory.ARC9Bridge.IsARC9Class(item.class) then
 			local slots = SCPArmory.ARC9Bridge.GetSlots(item.class)
 			if #slots == 0 then
-				draw.SimpleText("AUCUN EMPLACEMENT D'ACCESSOIRE", "SCPArmory_RoN_Small", 16, y, COL.faint)
+				draw.SimpleText(T("AUCUN EMPLACEMENT D'ACCESSOIRE"), "SCPArmory_RoN_Small", 16, y, COL.faint)
 			end
 			for _, slot in ipairs(slots) do
 				local installed = attSel[curWeaponKey][slot.index]
@@ -840,7 +868,7 @@ local function OpenMenu()
 				if y > h - 20 then break end
 			end
 		else
-			draw.SimpleText("ARME NON ARC9 — PAS DE RAIL", "SCPArmory_RoN_Small", 16, y, COL.faint)
+			draw.SimpleText(T("ARME NON ARC9 — PAS DE RAIL"), "SCPArmory_RoN_Small", 16, y, COL.faint)
 		end
 	end
 
@@ -867,12 +895,12 @@ local function OpenMenu()
 
 				local infos = {}
 				if item.stats then
-					if item.stats.degats then table.insert(infos, "DÉGÂTS " .. item.stats.degats) end
-					if item.stats.cadence then table.insert(infos, "CADENCE " .. item.stats.cadence) end
-					if item.stats.controle then table.insert(infos, "CONTRÔLE " .. item.stats.controle) end
-					if item.stats.precision then table.insert(infos, "PRÉCISION " .. item.stats.precision) end
+					if item.stats.degats then table.insert(infos, T("DÉGÂTS") .. " " .. item.stats.degats) end
+					if item.stats.cadence then table.insert(infos, T("CADENCE") .. " " .. item.stats.cadence) end
+					if item.stats.controle then table.insert(infos, T("CONTRÔLE") .. " " .. item.stats.controle) end
+					if item.stats.precision then table.insert(infos, T("PRÉCISION") .. " " .. item.stats.precision) end
 				end
-				if item.armor then table.insert(infos, "ARMURE +" .. item.armor) end
+				if item.armor then table.insert(infos, T("ARMURE") .. " +" .. item.armor) end
 				table.insert(infos, string.format("%.1f KG", item.weight or 0))
 				draw.SimpleText(table.concat(infos, "   ·   "), "SCPArmory_RoN_Small", 0, 92, COL.faint)
 			end
@@ -896,13 +924,13 @@ local function OpenMenu()
 		end
 		local stats = s.statsCache
 
-		draw.SimpleText("CHARGEMENT", "SCPArmory_RoN_Label", 0, 8, COL.dim)
-		draw.SimpleText(stats.class, "SCPArmory_RoN_Label", w - 10, 8, COL.red, TEXT_ALIGN_RIGHT)
+		draw.SimpleText(T("CHARGEMENT"), "SCPArmory_RoN_Label", 0, 8, COL.dim)
+		draw.SimpleText(T(stats.class), "SCPArmory_RoN_Label", w - 10, 8, COL.red, TEXT_ALIGN_RIGHT)
 
 		local rows = {
-			{ "POIDS", string.format("%.1f KG", stats.weight), stats.weight / 30 },
-			{ "MOBILITÉ", stats.mobility .. " %", stats.mobility / 110 },
-			{ "ARMURE", stats.armor .. " PTS", stats.armor / SCPArmory.Config.MaxArmor },
+			{ T("POIDS"), string.format("%.1f KG", stats.weight), stats.weight / 30 },
+			{ T("MOBILITÉ"), stats.mobility .. " %", stats.mobility / 110 },
+			{ T("ARMURE"), stats.armor .. " PTS", stats.armor / SCPArmory.Config.MaxArmor },
 		}
 
 		-- Les barres glissent en douceur vers leur nouvelle valeur
@@ -938,7 +966,7 @@ local function OpenMenu()
 			surface.SetDrawColor(COL.red)
 			surface.DrawRect(3, 6, 8, 8)
 		end
-		draw.SimpleText("Réappliquer ce chargement au respawn", "SCPArmory_RoN_Small", 22, h / 2,
+		draw.SimpleText(T("Réappliquer ce chargement au respawn"), "SCPArmory_RoN_Small", 22, h / 2,
 			hov and COL.soft or COL.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 	end
 	autoChk.DoClick = function(s)
@@ -957,26 +985,25 @@ local function OpenMenu()
 		-- Respiration discrète au repos
 		local pulse = (1 - s.hf) * math.sin(RealTime() * 2.2) * 7
 
-		surface.SetDrawColor(
-			math.Clamp(Lerp(s.hf, COL.red.r, COL.redHi.r) + pulse, 0, 255),
-			math.Clamp(Lerp(s.hf, COL.red.g, COL.redHi.g) + pulse * 0.3, 0, 255),
-			math.Clamp(Lerp(s.hf, COL.red.b, COL.redHi.b) + pulse * 0.3, 0, 255), 255)
-		surface.DrawRect(0, 0, w, h)
+		btnBG.r = math.Clamp(Lerp(s.hf, COL.red.r, COL.redHi.r) + pulse, 0, 255)
+		btnBG.g = math.Clamp(Lerp(s.hf, COL.red.g, COL.redHi.g) + pulse * 0.3, 0, 255)
+		btnBG.b = math.Clamp(Lerp(s.hf, COL.red.b, COL.redHi.b) + pulse * 0.3, 0, 255)
+		draw.RoundedBox(8, 0, 0, w, h, btnBG)
 
 		-- Liseré blanc qui s'allume au survol
 		if s.hf > 0.02 then
 			surface.SetDrawColor(255, 255, 255, 60 * s.hf)
-			surface.DrawOutlinedRect(2, 2, w - 4, h - 4, 1)
+			surface.DrawOutlinedRect(3, 3, w - 6, h - 6, 1)
 		end
 
-		draw.SimpleText("DÉPLOYER", "SCPArmory_RoN_Btn", w / 2, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText(T("DÉPLOYER"), "SCPArmory_RoN_Btn", w / 2, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
 		-- Flash au clic
 		if s.flashT then
 			local fa = 1 - (RealTime() - s.flashT) / 0.25
 			if fa > 0 then
-				surface.SetDrawColor(255, 255, 255, 170 * fa)
-				surface.DrawRect(0, 0, w, h)
+				flashBG.a = 170 * fa
+				draw.RoundedBox(8, 0, 0, w, h, flashBG)
 			end
 		end
 	end
@@ -1053,16 +1080,9 @@ local function OpenMenu()
 	backBtn.Paint = function(s, w, h)
 		s.hf = Lerp(FrameTime() * 10, s.hf or 0, s:IsHovered() and 1 or 0)
 
-		surface.SetDrawColor(
-			Lerp(s.hf, COL.line.r, COL.text.r),
-			Lerp(s.hf, COL.line.g, COL.text.g),
-			Lerp(s.hf, COL.line.b, COL.text.b), 255)
-		surface.DrawOutlinedRect(0, 0, w, h, 1)
-		if s.hf > 0.02 then
-			surface.SetDrawColor(255, 255, 255, 10 * s.hf)
-			surface.DrawRect(1, 1, w - 2, h - 2)
-		end
-		draw.SimpleText("RETOUR", "SCPArmory_RoN_Btn", w / 2 - 12, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		backBG.a = 18 + 34 * s.hf
+		draw.RoundedBox(8, 0, 0, w, h, backBG)
+		draw.SimpleText(T("RETOUR"), "SCPArmory_RoN_Btn", w / 2 - 12, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		draw.SimpleText("ESC", "SCPArmory_RoN_Small", w - 10, h / 2, COL.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 	end
 	backBtn.DoClick = GoBack
@@ -1070,6 +1090,7 @@ local function OpenMenu()
 	-- --------------------------------------------- construction de la liste
 
 	local function AddSection(label)
+		label = T(label)
 		local pnl = scroll:Add("DPanel")
 		pnl:Dock(TOP)
 		pnl:DockMargin(0, 10, 10, 4)
@@ -1082,6 +1103,7 @@ local function OpenMenu()
 	end
 
 	local function AddNote(text)
+		text = T(text)
 		local pnl = scroll:Add("DPanel")
 		pnl:Dock(TOP)
 		pnl:DockMargin(0, 4, 10, 0)
@@ -1098,13 +1120,13 @@ local function OpenMenu()
 
 		local btn = scroll:Add("DButton")
 		btn:Dock(TOP)
-		btn:DockMargin(0, 0, 10, 0)
+		btn:DockMargin(0, 0, 10, 5)
 		btn:SetTall(tall)
 		btn:SetText("")
 
 		if withImage and item and not item.icon and HasModel(item) then
 			local icon = vgui.Create("DModelPanel", btn)
-			icon:SetPos(0, 4)
+			icon:SetPos(8, 4)
 			icon:SetSize(170, 46)
 			icon:SetModel(item.model)
 			icon:SetMouseInputEnabled(false)
@@ -1115,36 +1137,33 @@ local function OpenMenu()
 			local hov = s:IsHovered()
 			s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
 
+			rowBG.a = 8 + 14 * s.hf
+			draw.RoundedBox(8, 0, 0, w, h, rowBG)
 			if s.hf > 0.01 then
-				surface.SetDrawColor(255, 255, 255, 6 * s.hf)
-				surface.DrawRect(0, 0, w, h)
 				surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * s.hf)
-				surface.DrawRect(-8, 0, 2, h)
+				surface.DrawRect(0, 3, 3, h - 6)
 			end
 
 			if withImage and item and item.icon then
-				SCPArmory.DrawWebIcon(item.icon, 0, 3, 170, 46)
+				SCPArmory.DrawWebIcon(item.icon, 8, 3, 170, 46)
 			end
 
 			-- Le texte glisse légèrement vers la droite au survol
-			local ox = math.Round(s.hf * 6)
+			local ox = 10 + math.Round(s.hf * 6)
 
 			if withImage then
-				draw.SimpleText(slot.label, "SCPArmory_RoN_Label", ox, 52, COL.dim)
-				DrawSpacedText(SCPArmory.FrUpper(item and item.name or "— AUCUN —"), "SCPArmory_RoN_Name", ox, 66,
+				draw.SimpleText(T(slot.label), "SCPArmory_RoN_Label", ox, 52, COL.dim)
+				DrawSpacedText(SCPArmory.FrUpper(item and item.name or T("— AUCUN —")), "SCPArmory_RoN_Name", ox, 66,
 					hov and COL.text or COL.soft, 1)
 				if item and item.ammo and item.ammo[1] then
-					draw.SimpleText("×" .. item.ammo[1].amount, "SCPArmory_RoN_Small", w - 10, 70,
+					draw.SimpleText("×" .. item.ammo[1].amount, "SCPArmory_RoN_Small", w - 12, 70,
 						COL.faint, TEXT_ALIGN_RIGHT)
 				end
 			else
-				draw.SimpleText(slot.label, "SCPArmory_RoN_Label", ox, 6, COL.dim)
-				DrawSpacedText(SCPArmory.FrUpper(item and item.name or "— AUCUN —"), "SCPArmory_RoN_NameSm", ox, 22,
+				draw.SimpleText(T(slot.label), "SCPArmory_RoN_Label", ox, 6, COL.dim)
+				DrawSpacedText(SCPArmory.FrUpper(item and item.name or T("— AUCUN —")), "SCPArmory_RoN_NameSm", ox, 22,
 					hov and COL.text or COL.soft, 1)
 			end
-
-			surface.SetDrawColor(COL.lineF)
-			surface.DrawRect(0, h - 1, w, 1)
 		end
 
 		btn.DoClick = function()
@@ -1169,7 +1188,7 @@ local function OpenMenu()
 
 		local btn = scroll:Add("DButton")
 		btn:Dock(TOP)
-		btn:DockMargin(0, 0, 10, 0)
+		btn:DockMargin(0, 0, 10, 5)
 		btn:SetTall(58)
 		btn:SetText("")
 
@@ -1186,15 +1205,15 @@ local function OpenMenu()
 			local hov = s:IsHovered()
 			s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
 
+			rowBG.a = 8 + 14 * s.hf
+			draw.RoundedBox(8, 0, 0, w, h, rowBG)
 			if s.hf > 0.01 then
-				surface.SetDrawColor(255, 255, 255, 6 * s.hf)
-				surface.DrawRect(0, 0, w, h)
 				surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * s.hf)
-				surface.DrawRect(-8, 0, 2, h)
+				surface.DrawRect(0, 3, 3, h - 6)
 			end
 			if equipped then
 				surface.SetDrawColor(COL.red)
-				surface.DrawRect(-8, 0, 2, h)
+				surface.DrawRect(0, 3, 3, h - 6)
 			end
 
 			if item.icon then
@@ -1207,12 +1226,9 @@ local function OpenMenu()
 
 			draw.SimpleText(string.format("%.1f KG", item.weight or 0), "SCPArmory_RoN_Small", ox, 32, COL.faint)
 			if item.ammo and item.ammo[1] then
-				draw.SimpleText("×" .. item.ammo[1].amount, "SCPArmory_RoN_Small", w - 10, 32,
+				draw.SimpleText("×" .. item.ammo[1].amount, "SCPArmory_RoN_Small", w - 12, 32,
 					COL.faint, TEXT_ALIGN_RIGHT)
 			end
-
-			surface.SetDrawColor(COL.lineF)
-			surface.DrawRect(0, h - 1, w, 1)
 		end
 
 		btn.OnCursorEntered = function()
@@ -1244,7 +1260,7 @@ local function OpenMenu()
 		head:SetTall(54)
 		head:SetText("")
 		head.Paint = function(s, _, h)
-			draw.SimpleText("‹  RETOUR", "SCPArmory_RoN_Label", 0, 4,
+			draw.SimpleText(T("‹  RETOUR"), "SCPArmory_RoN_Label", 0, 4,
 				s:IsHovered() and COL.text or COL.dim)
 			DrawSpacedText(label, "SCPArmory_RoN_Name", 0, 22, COL.text, 2)
 			surface.SetDrawColor(COL.red)
@@ -1276,7 +1292,7 @@ local function OpenMenu()
 			tab:SetText("")
 			tab.Paint = function(s, w, h)
 				local active = (curWeaponKey == wkey)
-				DrawSpacedText(wkey == "primary" and "PRINCIPALE" or "SECONDAIRE", "SCPArmory_RoN_Label",
+				DrawSpacedText(wkey == "primary" and T("PRINCIPALE") or T("SECONDAIRE"), "SCPArmory_RoN_Label",
 					10, 9, active and COL.text or (s:IsHovered() and COL.soft or COL.dim), 2)
 				if active then
 					surface.SetDrawColor(COL.red)
@@ -1298,18 +1314,18 @@ local function OpenMenu()
 		-- Ligne de l'arme : cliquer pour la remplacer
 		local wbtn = scroll:Add("DButton")
 		wbtn:Dock(TOP)
-		wbtn:DockMargin(0, 0, 10, 0)
+		wbtn:DockMargin(0, 0, 10, 5)
 		wbtn:SetTall(62)
 		wbtn:SetText("")
 		wbtn.Paint = function(s, w, h)
+			rowBG.a = s:IsHovered() and 22 or 8
+			draw.RoundedBox(8, 0, 0, w, h, rowBG)
 			surface.SetDrawColor(COL.red)
-			surface.DrawRect(-8, 0, 2, h)
-			draw.SimpleText(slotDef.label .. "  —  CHANGER D'ARME", "SCPArmory_RoN_Label", 0, 8,
+			surface.DrawRect(0, 3, 3, h - 6)
+			draw.SimpleText(T(slotDef.label) .. "  —  " .. T("CHANGER D'ARME"), "SCPArmory_RoN_Label", 12, 8,
 				s:IsHovered() and COL.soft or COL.dim)
-			DrawSpacedText(SCPArmory.FrUpper(item and item.name or "— AUCUNE —"), "SCPArmory_RoN_Name", 0, 26,
+			DrawSpacedText(SCPArmory.FrUpper(item and item.name or T("— AUCUNE —")), "SCPArmory_RoN_Name", 12, 26,
 				s:IsHovered() and COL.text or COL.soft, 1)
-			surface.SetDrawColor(COL.lineF)
-			surface.DrawRect(0, h - 1, w, 1)
 		end
 		wbtn.DoClick = function()
 			mode = "select"
@@ -1339,29 +1355,26 @@ local function OpenMenu()
 		for _, aslot in ipairs(slots) do
 			local btn = scroll:Add("DButton")
 			btn:Dock(TOP)
-			btn:DockMargin(0, 0, 10, 0)
+			btn:DockMargin(0, 0, 10, 5)
 			btn:SetTall(52)
 			btn:SetText("")
 			btn.Paint = function(s, w, h)
 				local hov = s:IsHovered()
 				s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
 				local installed = attSel[curWeaponKey][aslot.index]
-				local name = installed and SCPArmory.FrUpper(SCPArmory.ARC9Bridge.AttName(installed)) or "—  VIDE  —"
+				local name = installed and SCPArmory.FrUpper(SCPArmory.ARC9Bridge.AttName(installed)) or T("—  VIDE  —")
 
+				rowBG.a = 8 + 14 * s.hf
+				draw.RoundedBox(8, 0, 0, w, h, rowBG)
 				if s.hf > 0.01 then
-					surface.SetDrawColor(255, 255, 255, 6 * s.hf)
-					surface.DrawRect(0, 0, w, h)
 					surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * s.hf)
-					surface.DrawRect(-8, 0, 2, h)
+					surface.DrawRect(0, 3, 3, h - 6)
 				end
 
-				local ox = math.Round(s.hf * 6)
+				local ox = 12 + math.Round(s.hf * 6)
 				draw.SimpleText(aslot.name, "SCPArmory_RoN_Label", ox, 6, COL.dim)
 				DrawSpacedText(name, "SCPArmory_RoN_NameSm", ox, 24,
 					installed and (hov and COL.text or COL.soft) or COL.faint, 1)
-
-				surface.SetDrawColor(COL.lineF)
-				surface.DrawRect(0, h - 1, w, 1)
 			end
 			btn.DoClick = function()
 				mode = "attselect"
@@ -1379,9 +1392,9 @@ local function OpenMenu()
 			clean:SetTall(32)
 			clean:SetText("")
 			clean.Paint = function(s, w, h)
-				surface.SetDrawColor(s:IsHovered() and COL.text or COL.line)
-				surface.DrawOutlinedRect(0, 0, w, h, 1)
-				draw.SimpleText("RETIRER TOUS LES ACCESSOIRES", "SCPArmory_RoN_Label", w / 2, h / 2,
+				rowBG.a = s:IsHovered() and 34 or 14
+				draw.RoundedBox(8, 0, 0, w, h, rowBG)
+				draw.SimpleText(T("RETIRER TOUS LES ACCESSOIRES"), "SCPArmory_RoN_Label", w / 2, h / 2,
 					COL.soft, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
 			clean.DoClick = function()
@@ -1411,19 +1424,19 @@ local function OpenMenu()
 		-- Ligne « aucun »
 		local noneBtn = scroll:Add("DButton")
 		noneBtn:Dock(TOP)
-		noneBtn:DockMargin(0, 0, 10, 0)
+		noneBtn:DockMargin(0, 0, 10, 5)
 		noneBtn:SetTall(40)
 		noneBtn:SetText("")
 		noneBtn.Paint = function(s, w, h)
 			local equipped = attSel[curWeaponKey][attSlot.index] == nil
+			rowBG.a = s:IsHovered() and 22 or 8
+			draw.RoundedBox(8, 0, 0, w, h, rowBG)
 			if equipped then
 				surface.SetDrawColor(COL.red)
-				surface.DrawRect(-8, 0, 2, h)
+				surface.DrawRect(0, 3, 3, h - 6)
 			end
-			DrawSpacedText("—  AUCUN  —", "SCPArmory_RoN_NameSm", 0, 10,
+			DrawSpacedText(T("—  AUCUN  —"), "SCPArmory_RoN_NameSm", 12, 10,
 				s:IsHovered() and COL.text or COL.soft, 1)
-			surface.SetDrawColor(COL.lineF)
-			surface.DrawRect(0, h - 1, w, 1)
 		end
 		noneBtn.DoClick = function() pick(nil) end
 
@@ -1436,7 +1449,7 @@ local function OpenMenu()
 		for _, att in ipairs(list) do
 			local btn = scroll:Add("DButton")
 			btn:Dock(TOP)
-			btn:DockMargin(0, 0, 10, 0)
+			btn:DockMargin(0, 0, 10, 5)
 			btn:SetTall(44)
 			btn:SetText("")
 			btn.Paint = function(s, w, h)
@@ -1444,23 +1457,21 @@ local function OpenMenu()
 				local hov = s:IsHovered()
 				s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
 
+				rowBG.a = 8 + 14 * s.hf
+				draw.RoundedBox(8, 0, 0, w, h, rowBG)
 				if s.hf > 0.01 then
-					surface.SetDrawColor(255, 255, 255, 6 * s.hf)
-					surface.DrawRect(0, 0, w, h)
 					surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * s.hf)
-					surface.DrawRect(-8, 0, 2, h)
+					surface.DrawRect(0, 3, 3, h - 6)
 				end
 				if equipped then
 					surface.SetDrawColor(COL.red)
-					surface.DrawRect(-8, 0, 2, h)
+					surface.DrawRect(0, 3, 3, h - 6)
 				end
 
-				local ox = math.Round(s.hf * 6)
+				local ox = 12 + math.Round(s.hf * 6)
 				DrawSpacedText(att.name, "SCPArmory_RoN_NameSm", ox, 6,
 					(equipped or hov) and COL.text or COL.soft, 1)
-				draw.SimpleText(att.cat, "SCPArmory_RoN_Small", w - 10, 26, COL.red, TEXT_ALIGN_RIGHT)
-				surface.SetDrawColor(COL.lineF)
-				surface.DrawRect(0, h - 1, w, 1)
+				draw.SimpleText(att.cat, "SCPArmory_RoN_Small", w - 12, 26, COL.red, TEXT_ALIGN_RIGHT)
 			end
 			btn.OnCursorEntered = function() hoverAtt = att end
 			btn.DoClick = function() pick(att.id) end
@@ -1500,7 +1511,7 @@ local function OpenMenu()
 
 					local btn = scroll:Add("DButton")
 					btn:Dock(TOP)
-					btn:DockMargin(0, 0, 10, 0)
+					btn:DockMargin(0, 0, 10, 5)
 					btn:SetTall(48)
 					btn:SetText("")
 					btn.Paint = function(s, w, h)
@@ -1510,14 +1521,12 @@ local function OpenMenu()
 							surface.SetDrawColor(255, 255, 255, 6 * s.hf)
 							surface.DrawRect(0, 0, w, h)
 							surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * s.hf)
-							surface.DrawRect(-8, 0, 2, h)
+							surface.DrawRect(0, 3, 3, h - 6)
 						end
-						local ox = math.Round(s.hf * 6)
+						local ox = 12 + math.Round(s.hf * 6)
 						draw.SimpleText(SCPArmory.FrUpper(opt.name), "SCPArmory_RoN_Label", ox, 6, COL.dim)
-						DrawSpacedText("VARIANTE " .. (cur + 1) .. " / " .. opt.num, "SCPArmory_RoN_NameSm", ox, 22,
+						DrawSpacedText(T("VARIANTE") .. " " .. (cur + 1) .. " / " .. opt.num, "SCPArmory_RoN_NameSm", ox, 22,
 							hov and COL.text or COL.soft, 1)
-						surface.SetDrawColor(COL.lineF)
-						surface.DrawRect(0, h - 1, w, 1)
 					end
 					btn.DoClick = function()
 						mode = "bgselect"
@@ -1542,7 +1551,7 @@ local function OpenMenu()
 			for v = 0, bgSlot.num - 1 do
 				local row = scroll:Add("DButton")
 				row:Dock(TOP)
-				row:DockMargin(0, 0, 10, 0)
+				row:DockMargin(0, 0, 10, 5)
 				row:SetTall(44)
 				row:SetText("")
 				row.Paint = function(s, w, h)
@@ -1550,25 +1559,23 @@ local function OpenMenu()
 					local hov = s:IsHovered()
 					s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
 
+					rowBG.a = 8 + 14 * s.hf
+					draw.RoundedBox(8, 0, 0, w, h, rowBG)
 					if s.hf > 0.01 then
-						surface.SetDrawColor(255, 255, 255, 6 * s.hf)
-						surface.DrawRect(0, 0, w, h)
 						surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * s.hf)
-						surface.DrawRect(-8, 0, 2, h)
+						surface.DrawRect(0, 3, 3, h - 6)
 					end
 					if equipped then
 						surface.SetDrawColor(COL.red)
-						surface.DrawRect(-8, 0, 2, h)
+						surface.DrawRect(0, 3, 3, h - 6)
 					end
 
-					local ox = math.Round(s.hf * 6)
-					DrawSpacedText("VARIANTE " .. (v + 1), "SCPArmory_RoN_NameSm", ox, 12,
+					local ox = 12 + math.Round(s.hf * 6)
+					DrawSpacedText(T("VARIANTE") .. " " .. (v + 1), "SCPArmory_RoN_NameSm", ox, 12,
 						(equipped or hov) and COL.text or COL.soft, 1)
 					if equipped then
-						draw.SimpleText("ÉQUIPÉE", "SCPArmory_RoN_Small", w - 10, 16, COL.red, TEXT_ALIGN_RIGHT)
+						draw.SimpleText(T("ÉQUIPÉE"), "SCPArmory_RoN_Small", w - 12, 16, COL.red, TEXT_ALIGN_RIGHT)
 					end
-					surface.SetDrawColor(COL.lineF)
-					surface.DrawRect(0, h - 1, w, 1)
 				end
 				row.DoClick = function()
 					selection.bg = selection.bg or {}
@@ -1580,7 +1587,7 @@ local function OpenMenu()
 				end
 			end
 		else
-			AddBackHeader(selectSlot.label, GoBack)
+			AddBackHeader(T(selectSlot.label), GoBack)
 			for _, item in ipairs(SCPArmory.Items[selectSlot.pool]) do
 				-- Un objet réservé à un autre job n'apparaît pas du tout
 				if SCPArmory.IsItemAvailable(LocalPlayer(), item) then

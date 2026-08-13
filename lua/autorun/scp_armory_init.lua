@@ -3,6 +3,7 @@
 
 if SERVER then
 	AddCSLuaFile("scp_armory/sh_config.lua")
+	AddCSLuaFile("scp_armory/sh_lang.lua")
 	AddCSLuaFile("scp_armory/sh_items.lua")
 	AddCSLuaFile("scp_armory/sh_autoload.lua")
 	AddCSLuaFile("scp_armory/sh_arc9.lua")
@@ -12,6 +13,7 @@ if SERVER then
 	AddCSLuaFile("scp_armory/cl_bodygroups.lua")
 
 	include("scp_armory/sh_config.lua")
+	include("scp_armory/sh_lang.lua")
 	include("scp_armory/sh_items.lua")
 	include("scp_armory/sh_autoload.lua")
 	include("scp_armory/sh_arc9.lua")
@@ -19,6 +21,7 @@ if SERVER then
 	include("scp_armory/sv_armory.lua")
 else
 	include("scp_armory/sh_config.lua")
+	include("scp_armory/sh_lang.lua")
 	include("scp_armory/sh_items.lua")
 	include("scp_armory/sh_autoload.lua")
 	include("scp_armory/sh_arc9.lua")
