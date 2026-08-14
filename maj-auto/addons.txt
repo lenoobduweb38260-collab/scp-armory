@@ -1,0 +1,11 @@
+# SCP Armory — liste des addons synchronisés automatiquement au démarrage
+#
+# Format : URL_du_dépôt  branche  dossier_dans_addons
+# - une ligne par addon, les lignes commençant par # sont ignorées ;
+# - le dossier est créé automatiquement s'il n'existe pas (git clone) ;
+# - s'il existe, il est remis exactement sur la branche distante à chaque
+#   démarrage : les modifications poussées par Claude sont appliquées.
+#
+# Ajoutez ici tout autre dépôt d'addon que Claude gère pour vous.
+
+https://github.com/lenoobduweb38260-collab/scp-armory.git claude/ready-or-not-loadout-gbii3v scp-armory

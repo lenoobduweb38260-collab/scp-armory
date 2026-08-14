@@ -46,6 +46,11 @@ restrictions par job et **chargement automatique des packs d'armes installés**.
   menu, notifications, menu d'apparence et étiquette 3D2D de l'armoire.
 - **Habillage « cartes »** : colonne et panneaux sur cartes translucides arrondies, lignes
   d'équipement en cartes espacées, boutons arrondis, barre d'accent en dégradé rouge → ambre.
+- **Mise à jour automatique au démarrage** (dossier [`maj-auto/`](maj-auto/LISEZMOI.md)) :
+  script Linux/Windows à brancher sur le démarrage du serveur — clone les addons manquants
+  (dossiers créés automatiquement) et applique les modifications poussées sur GitHub à chaque
+  restart — plus l'addon `scp_autoupdate` qui surveille GitHub en jeu et prévient les
+  superadmins (`!maj`) dès qu'une mise à jour est disponible.
 
 ## Installation
 
