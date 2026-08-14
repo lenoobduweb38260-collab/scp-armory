@@ -1,16 +1,19 @@
--- SCP Cloud Loader — serveur
+-- SCP Cloud Loader — serveur (v2)
 --
 -- À chaque démarrage : récupère le dernier commit de la branche, télécharge
 -- les fichiers modifiés (cache data/scp_cloudloader/), exécute l'armurerie
 -- (voir sh_runner) puis distribue les fichiers client aux joueurs par le
--- réseau. Si GitHub est injoignable, le serveur démarre sur la dernière
--- copie en cache : jamais bloqué.
+-- réseau, en file d'attente pour ne jamais saturer leur connexion. Chaque
+-- client confirme son chargement : la console dit qui a réellement reçu
+-- l'armurerie. Si GitHub est injoignable, démarrage sur le cache.
+--
+-- Diagnostic : commande console « scp_cloud_status » (serveur ou superadmin).
 --
 -- Confiance et sécurité :
 --  - sources épinglées : uniquement api.github.com et raw.githubusercontent.com,
 --    sur le dépôt et la branche configurés ci-dessous, en HTTPS ;
 --  - tailles, nombres de fichiers et réponses bornés et validés ;
---  - les fichiers serveur (sv_*) ne sont jamais envoyés aux clients ;
+--  - les fichiers serveur (sv_*, init.lua d'entité) ne partent jamais aux clients ;
 --  - requêtes des clients limitées en cadence et validées ;
 --  - si l'addon scp-armory est présent sur le disque, le cloud se désactive.
 
@@ -18,6 +21,7 @@ util.AddNetworkString("SCPCloud_Hello")
 util.AddNetworkString("SCPCloud_Manifest")
 util.AddNetworkString("SCPCloud_Need")
 util.AddNetworkString("SCPCloud_File")
+util.AddNetworkString("SCPCloud_Done")
 
 -- ------------------------------------------------ configuration du dépôt
 local REPO   = "lenoobduweb38260-collab/scp-armory"
@@ -30,6 +34,8 @@ local MAX_MAT_SIZE = 8388608  -- 8 Mo par image de fond
 local CACHE_DIR    = "scp_cloudloader"
 local INDEX_FILE   = CACHE_DIR .. "/index.txt"
 local CHUNK        = 40000
+local BOOT_DELAY   = 5        -- l'HTTP de GMod n'est pas fiable trop tôt au boot
+local RETRY_DELAY  = 15
 
 local Log = SCPCloud.Log
 
@@ -39,6 +45,10 @@ local commitSha = nil
 local loaded = false
 local manifestComp = nil
 local waiting = {}     -- joueurs connectés avant la fin du chargement
+local retried = false
+
+-- État exposé pour le diagnostic
+SCPCloud.SV = { state = "démarrage", errors = {}, clients = {} }
 
 local function CachePath(sha)
 	return CACHE_DIR .. "/" .. string.sub(sha, 1, 32) .. ".txt"
@@ -103,12 +113,18 @@ local function BuildManifest()
 	return util.Compress(util.TableToJSON({ commit = commitSha, files = list, mats = m }))
 end
 
+local function ClientTag(ply)
+	return ply:Nick() .. " (" .. (ply:SteamID() or "?") .. ")"
+end
+
 local function SendManifest(ply)
 	if not manifestComp or not IsValid(ply) then return end
 	net.Start("SCPCloud_Manifest")
 	net.WriteUInt(#manifestComp, 24)
 	net.WriteData(manifestComp, #manifestComp)
 	net.Send(ply)
+	SCPCloud.SV.clients[ply:SteamID() or "?"] = "manifeste envoyé"
+	Log("Manifeste envoyé à " .. ClientTag(ply) .. ".")
 end
 
 local function FlushWaiting()
@@ -119,11 +135,21 @@ local function FlushWaiting()
 end
 
 local function Activate(fromCache)
+	local stats = SCPCloud.Execute(files, ReadCode)
 	loaded = true
 	manifestComp = BuildManifest()
-	Log((fromCache and "GitHub injoignable — copie en cache" or "GitHub") .. " : armurerie chargée (commit "
-		.. string.sub(commitSha or "?", 1, 7) .. ", " .. table.Count(files) .. " fichiers).")
-	SCPCloud.Execute(files, ReadCode)
+	SCPCloud.SV.errors = stats.errors
+	SCPCloud.SV.commit = string.sub(commitSha or "?", 1, 7)
+
+	if #stats.errors == 0 then
+		SCPCloud.SV.state = "armurerie active"
+		Log((fromCache and "GitHub injoignable — copie en cache" or "GitHub") .. " : armurerie EXÉCUTÉE ("
+			.. stats.ran .. " fichiers, commit " .. SCPCloud.SV.commit .. "). Serveur prêt.")
+	else
+		SCPCloud.SV.state = "exécutée avec " .. #stats.errors .. " erreur(s)"
+		Log("Armurerie exécutée avec " .. #stats.errors
+			.. " ERREUR(S) — détail ci-dessus et via scp_cloud_status.")
+	end
 	FlushWaiting()
 end
 
@@ -141,18 +167,27 @@ local function LoadIndex()
 	return true
 end
 
+local Boot
+
 local function FallbackCache(reason)
 	Log(reason .. " — tentative sur la dernière copie en cache…")
 	if LoadIndex() then
 		Activate(true)
+	elseif not retried then
+		retried = true
+		SCPCloud.SV.state = "nouvel essai dans " .. RETRY_DELAY .. " s"
+		Log("Aucun cache utilisable : nouvel essai GitHub dans " .. RETRY_DELAY .. " s.")
+		timer.Simple(RETRY_DELAY, Boot)
 	else
-		Log("Aucun cache utilisable : armurerie indisponible pour ce démarrage.")
+		SCPCloud.SV.state = "échec : " .. reason
+		Log("Échec définitif pour ce démarrage : armurerie indisponible (" .. reason .. ").")
 	end
 end
 
-local function Boot()
+Boot = function()
 	-- L'addon réel est sur le disque : le cloud s'efface complètement
 	if istable(SCPArmory) and SCPArmory.Slots then
+		SCPCloud.SV.state = "désactivé (addon sur le disque)"
 		Log("Addon scp-armory présent sur le disque : chargement cloud désactivé.")
 		loaded = true
 		manifestComp = util.Compress(util.TableToJSON({ disabled = true }))
@@ -160,6 +195,7 @@ local function Boot()
 		return
 	end
 
+	SCPCloud.SV.state = "téléchargement GitHub…"
 	file.CreateDir(CACHE_DIR)
 
 	Fetch("https://api.github.com/repos/" .. REPO .. "/commits/" .. BRANCH, function(body)
@@ -245,27 +281,74 @@ local function Boot()
 end
 
 hook.Add("InitPostEntity", "SCPCloud_Boot", function()
-	timer.Simple(1, Boot)
+	Log("Chargeur cloud v2 — démarrage dans " .. BOOT_DELAY .. " s.")
+	timer.Simple(BOOT_DELAY, Boot)
 end)
 
 -- ----------------------------------------- distribution aux joueurs
 
+-- Envoi d'un fichier complet (quelques messages) à un joueur
+local function SendFile(ply, sha)
+	local code = file.Read(CachePath(sha), "DATA")
+	if not isstring(code) or not IsValid(ply) then return end
+
+	local comp = util.Compress(code)
+	local total = math.ceil(#comp / CHUNK)
+	for part = 1, total do
+		local piece = string.sub(comp, (part - 1) * CHUNK + 1, part * CHUNK)
+		net.Start("SCPCloud_File")
+		net.WriteString(sha)
+		net.WriteUInt(part, 8)
+		net.WriteUInt(total, 8)
+		net.WriteUInt(#piece, 16)
+		net.WriteData(piece, #piece)
+		net.Send(ply)
+	end
+end
+
+-- File d'attente d'envoi : 2 fichiers toutes les 0,1 s et par joueur au plus,
+-- pour ne jamais saturer le canal réseau d'un client (messages perdus/kick)
+local sendQueue = {}
+
+local function PumpQueue()
+	for _ = 1, 2 do
+		local item = table.remove(sendQueue, 1)
+		if not item then
+			timer.Remove("SCPCloud_Pump")
+			return
+		end
+		if IsValid(item.ply) then
+			SendFile(item.ply, item.sha)
+		end
+	end
+end
+
+local function QueueFiles(ply, shas)
+	for _, sha in ipairs(shas) do
+		table.insert(sendQueue, { ply = ply, sha = sha })
+	end
+	if not timer.Exists("SCPCloud_Pump") then
+		timer.Create("SCPCloud_Pump", 0.1, 0, PumpQueue)
+	end
+end
+
 net.Receive("SCPCloud_Hello", function(_, ply)
 	if not IsValid(ply) then return end
 	if (ply.SCPCloudHelloRL or 0) > CurTime() then return end
-	ply.SCPCloudHelloRL = CurTime() + 5
+	ply.SCPCloudHelloRL = CurTime() + 4
 
 	if loaded then
 		SendManifest(ply)
 	else
 		table.insert(waiting, ply)
+		SCPCloud.SV.clients[ply:SteamID() or "?"] = "en attente du chargement serveur"
 	end
 end)
 
 net.Receive("SCPCloud_Need", function(_, ply)
 	if not IsValid(ply) or not loaded or not files then return end
 	if (ply.SCPCloudNeedRL or 0) > CurTime() then return end
-	ply.SCPCloudNeedRL = CurTime() + 5
+	ply.SCPCloudNeedRL = CurTime() + 4
 
 	-- Seuls les sha réellement servis aux clients sont acceptés
 	local allowed = {}
@@ -276,26 +359,56 @@ net.Receive("SCPCloud_Need", function(_, ply)
 	end
 
 	local n = math.min(net.ReadUInt(9), MAX_FILES)
-	local sent = 0
+	local list, seen = {}, {}
 	for _ = 1, n do
 		local sha = net.ReadString()
-		if #sha <= 64 and allowed[sha] and sent < MAX_FILES then
-			local code = file.Read(CachePath(sha), "DATA")
-			if isstring(code) then
-				local comp = util.Compress(code)
-				local total = math.ceil(#comp / CHUNK)
-				for part = 1, total do
-					local piece = string.sub(comp, (part - 1) * CHUNK + 1, part * CHUNK)
-					net.Start("SCPCloud_File")
-					net.WriteString(sha)
-					net.WriteUInt(part, 8)
-					net.WriteUInt(total, 8)
-					net.WriteUInt(#piece, 16)
-					net.WriteData(piece, #piece)
-					net.Send(ply)
-				end
-				sent = sent + 1
-			end
+		if #sha <= 64 and allowed[sha] and not seen[sha] then
+			seen[sha] = true
+			table.insert(list, sha)
 		end
 	end
+
+	if #list > 0 then
+		SCPCloud.SV.clients[ply:SteamID() or "?"] = "envoi de " .. #list .. " fichier(s)…"
+		Log("Envoi de " .. #list .. " fichier(s) à " .. ClientTag(ply) .. "…")
+		QueueFiles(ply, list)
+	end
 end)
+
+-- Confirmation du client : l'armurerie tourne (ou pas) chez lui
+net.Receive("SCPCloud_Done", function(_, ply)
+	if not IsValid(ply) then return end
+	if (ply.SCPCloudDoneRL or 0) > CurTime() then return end
+	ply.SCPCloudDoneRL = CurTime() + 4
+
+	local errs = net.ReadUInt(8)
+	local msg = (errs == 0) and "armurerie chargée chez le joueur"
+		or ("chargée chez le joueur avec " .. errs .. " erreur(s) — voir sa console")
+	SCPCloud.SV.clients[ply:SteamID() or "?"] = msg
+	Log(ClientTag(ply) .. " : " .. msg .. ".")
+end)
+
+-- Les superadmins voient l'état du cloud en arrivant (diagnostic sans console)
+hook.Add("PlayerInitialSpawn", "SCPCloud_AdminNotice", function(ply)
+	timer.Simple(15, function()
+		if not (IsValid(ply) and ply:IsSuperAdmin()) then return end
+		ply:ChatPrint("[ARMURERIE CLOUD] Serveur : " .. tostring(SCPCloud.SV.state)
+			.. (SCPCloud.SV.commit and (" (commit " .. SCPCloud.SV.commit .. ")") or "")
+			.. ". Détail : scp_cloud_status en console.")
+	end)
+end)
+
+-- Diagnostic : scp_cloud_status (console serveur ou superadmin)
+concommand.Add("scp_cloud_status", function(ply)
+	if IsValid(ply) and not ply:IsSuperAdmin() then return end
+	local out = IsValid(ply)
+		and function(m) ply:PrintMessage(HUD_PRINTCONSOLE, "[ARMURERIE CLOUD] " .. m) end
+		or Log
+
+	out("État serveur : " .. tostring(SCPCloud.SV.state))
+	out("Commit : " .. tostring(SCPCloud.SV.commit or "?") .. " — dépôt " .. REPO .. " @ " .. BRANCH)
+	out("Fichiers lua : " .. (files and table.Count(files) or 0)
+		.. ", erreurs d'exécution : " .. #SCPCloud.SV.errors)
+	for _, e in ipairs(SCPCloud.SV.errors) do out("  ERREUR " .. e) end
+	for sid, st in pairs(SCPCloud.SV.clients) do out("  Joueur " .. sid .. " : " .. st) end
+end, nil, "État du chargeur cloud de l'armurerie.")

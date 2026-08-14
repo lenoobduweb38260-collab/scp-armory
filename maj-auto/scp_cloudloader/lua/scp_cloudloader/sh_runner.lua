@@ -19,10 +19,18 @@ end
 
 -- files   : { [chemin] = { sha = ..., size = ... } } (chemins depuis la racine du dépôt)
 -- readCode: function(entry, chemin) -> contenu du fichier ou nil
+-- Retourne { ran = nombre de fichiers exécutés, errors = { "chemin — erreur", ... } }
 function SCPCloud.Execute(files, readCode)
+	local stats = { ran = 0, errors = {} }
 	local currentDir = ""
 	local realInclude, realAddCS = include, AddCSLuaFile
 	local RunFile
+
+	local function Fail(path, err)
+		local line = path .. " — " .. tostring(err)
+		table.insert(stats.errors, line)
+		SCPCloud.Log("ERREUR : " .. line)
+	end
 
 	local function Resolve(inc)
 		if not isstring(inc) or inc == "" or #inc > 128 then return nil end
@@ -49,13 +57,13 @@ function SCPCloud.Execute(files, readCode)
 
 		local code = readCode(entry, path)
 		if not isstring(code) then
-			SCPCloud.Log("Fichier manquant en cache : " .. path)
+			Fail(path, "fichier manquant en cache")
 			return
 		end
 
 		local fn = CompileString(code, "scp_cloud/" .. path, false)
 		if not isfunction(fn) then
-			SCPCloud.Log("Erreur de syntaxe dans " .. path .. " : " .. tostring(fn))
+			Fail(path, fn)
 			return
 		end
 
@@ -64,8 +72,10 @@ function SCPCloud.Execute(files, readCode)
 		local ok, err = pcall(fn)
 		currentDir = prevDir
 
-		if not ok then
-			SCPCloud.Log("Erreur dans " .. path .. " : " .. tostring(err))
+		if ok then
+			stats.ran = stats.ran + 1
+		else
+			Fail(path, err)
 		end
 	end
 
@@ -108,7 +118,7 @@ function SCPCloud.Execute(files, readCode)
 			ENT = { ClassName = cls, Folder = "entities/" .. cls }
 			RunFile(entry)
 			local ok, err = pcall(scripted_ents.Register, ENT, cls)
-			if not ok then SCPCloud.Log("Entité " .. cls .. " : " .. tostring(err)) end
+			if not ok then Fail("entities/" .. cls, err) end
 			ENT = nil
 		end
 	end
@@ -120,7 +130,9 @@ function SCPCloud.Execute(files, readCode)
 	for name, fn in pairs(hook.GetTable()["InitPostEntity"] or {}) do
 		if not beforeIPE[name] and isfunction(fn) then
 			local ok, err = pcall(fn)
-			if not ok then SCPCloud.Log("InitPostEntity " .. tostring(name) .. " : " .. tostring(err)) end
+			if not ok then Fail("InitPostEntity/" .. tostring(name), err) end
 		end
 	end
+
+	return stats
 end

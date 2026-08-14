@@ -1,16 +1,22 @@
--- SCP Cloud Loader — client
+-- SCP Cloud Loader — client (v2)
 --
--- À la connexion : demande le manifeste au serveur, télécharge les fichiers
--- manquants (cache data/scp_cloudloader/, donc instantané aux reconnexions),
--- exécute l'armurerie côté client (sh_runner), puis récupère les images de
--- fond directement depuis GitHub dans data/scp_armory/ (le menu les y
--- cherche quand materials/ n'est pas monté).
+-- À la connexion : demande le manifeste au serveur (avec relances tant qu'il
+-- ne répond pas), télécharge les fichiers manquants (cache
+-- data/scp_cloudloader/, donc instantané aux reconnexions), exécute
+-- l'armurerie côté client (sh_runner), confirme au serveur, puis récupère
+-- les images de fond depuis GitHub dans data/scp_armory/.
+--
+-- Diagnostic : commande console « scp_cloud_status » côté client.
 
 local CACHE_DIR    = "scp_cloudloader"
 local MAT_INDEX    = CACHE_DIR .. "/mats.txt"
 local MAX_LUA_SIZE = 262144
 local MAX_MAT_SIZE = 8388608
 local CHUNK        = 40000
+local HELLO_TRIES  = 8      -- relances du bonjour (serveur encore en chargement…)
+local HELLO_EVERY  = 8
+local NEED_TRIES   = 4      -- relances de la demande de fichiers manquants
+local NEED_EVERY   = 20
 
 local Log = SCPCloud.Log
 
@@ -20,6 +26,9 @@ local needed = {}   -- sha -> true (en attente du serveur)
 local parts = {}    -- sha -> morceaux reçus
 local started = false
 local executed = false
+
+-- État exposé pour le diagnostic
+SCPCloud.CL = { state = "attente du serveur", missing = 0, errors = {} }
 
 local function CachePath(sha)
 	return CACHE_DIR .. "/" .. string.sub(sha, 1, 32) .. ".txt"
@@ -61,41 +70,33 @@ end
 local function ExecuteAll()
 	if executed then return end
 	executed = true
-	Log("Armurerie chargée (" .. table.Count(files) .. " fichiers client).")
-	SCPCloud.Execute(files, ReadCode)
+
+	local stats = SCPCloud.Execute(files, ReadCode)
+	SCPCloud.CL.errors = stats.errors
+	SCPCloud.CL.state = (#stats.errors == 0)
+		and ("armurerie chargée (" .. stats.ran .. " fichiers)")
+		or ("chargée avec " .. #stats.errors .. " erreur(s)")
+	Log("Client : " .. SCPCloud.CL.state .. ".")
+
+	-- Confirme au serveur (visible dans sa console : qui a vraiment chargé)
+	net.Start("SCPCloud_Done")
+	net.WriteUInt(math.min(#stats.errors, 255), 8)
+	net.SendToServer()
+
 	FetchMaterials()
 end
 
-net.Receive("SCPCloud_Manifest", function()
-	if started then return end
-
-	local len = net.ReadUInt(24)
-	local data = util.JSONToTable(util.Decompress(net.ReadData(len) or "", 4194304) or "")
-	if not istable(data) or data.disabled or not istable(data.files) then return end
-	started = true
-
-	file.CreateDir(CACHE_DIR)
-	files = {}
-	mats = istable(data.mats) and data.mats or {}
-
+-- Demande des fichiers manquants, relancée tant qu'il en reste
+local function RequestMissing()
 	local missing = {}
-	for _, e in ipairs(data.files) do
-		if istable(e) and isstring(e.p) and isstring(e.s) and #e.s <= 64
-			and string.match(e.p, "^lua/[%w_/%-]+%.lua$") then
-			files[e.p] = { sha = e.s, size = tonumber(e.z) or 0 }
-			if not file.Exists(CachePath(e.s), "DATA") and not needed[e.s] then
-				needed[e.s] = true
-				table.insert(missing, e.s)
-			end
-		end
+	for sha in pairs(needed) do
+		table.insert(missing, sha)
 	end
+	if #missing == 0 then return end
 
-	if #missing == 0 then
-		ExecuteAll()
-		return
-	end
+	SCPCloud.CL.state = "téléchargement de " .. #missing .. " fichier(s)…"
+	SCPCloud.CL.missing = #missing
 
-	Log("Téléchargement de " .. #missing .. " fichier(s)…")
 	local count = math.min(#missing, 400)
 	net.Start("SCPCloud_Need")
 	net.WriteUInt(count, 9)
@@ -103,6 +104,54 @@ net.Receive("SCPCloud_Manifest", function()
 		net.WriteString(missing[i])
 	end
 	net.SendToServer()
+end
+
+net.Receive("SCPCloud_Manifest", function()
+	if started then return end
+
+	local len = net.ReadUInt(24)
+	local data = util.JSONToTable(util.Decompress(net.ReadData(len) or "", 4194304) or "")
+	if not istable(data) then return end
+	if data.disabled then
+		started = true
+		SCPCloud.CL.state = "désactivé (addon sur le disque du serveur)"
+		return
+	end
+	if not istable(data.files) then return end
+	started = true
+
+	file.CreateDir(CACHE_DIR)
+	files = {}
+	mats = istable(data.mats) and data.mats or {}
+
+	for _, e in ipairs(data.files) do
+		if istable(e) and isstring(e.p) and isstring(e.s) and #e.s <= 64
+			and string.match(e.p, "^lua/[%w_/%-]+%.lua$") then
+			files[e.p] = { sha = e.s, size = tonumber(e.z) or 0 }
+			if not file.Exists(CachePath(e.s), "DATA") then
+				needed[e.s] = true
+			end
+		end
+	end
+
+	if next(needed) == nil then
+		ExecuteAll()
+		return
+	end
+
+	RequestMissing()
+
+	-- Relances : un message réseau peut se perdre, le serveur être occupé…
+	local tries = 0
+	timer.Create("SCPCloud_NeedRetry", NEED_EVERY, NEED_TRIES, function()
+		if executed or next(needed) == nil then
+			timer.Remove("SCPCloud_NeedRetry")
+			return
+		end
+		tries = tries + 1
+		Log("Fichiers toujours manquants (" .. table.Count(needed) .. ") — relance " .. tries .. ".")
+		RequestMissing()
+	end)
 end)
 
 net.Receive("SCPCloud_File", function()
@@ -134,16 +183,47 @@ net.Receive("SCPCloud_File", function()
 		file.Write(CachePath(sha), code)
 	end
 
+	SCPCloud.CL.missing = table.Count(needed)
 	if next(needed) == nil then
+		timer.Remove("SCPCloud_NeedRetry")
 		ExecuteAll()
 	end
 end)
 
+-- Bonjour au serveur, relancé tant que le manifeste n'est pas arrivé
 hook.Add("InitPostEntity", "SCPCloud_Hello", function()
 	timer.Simple(2, function()
 		-- L'addon réel est monté chez ce client : rien à charger
-		if istable(SCPArmory) and SCPArmory.Slots then return end
-		net.Start("SCPCloud_Hello")
-		net.SendToServer()
+		if istable(SCPArmory) and SCPArmory.Slots then
+			SCPCloud.CL.state = "désactivé (addon monté localement)"
+			return
+		end
+
+		local tries = 0
+		local function Hello()
+			if started then return end
+			tries = tries + 1
+			SCPCloud.CL.state = "demande au serveur (essai " .. tries .. ")"
+			net.Start("SCPCloud_Hello")
+			net.SendToServer()
+		end
+
+		Hello()
+		timer.Create("SCPCloud_HelloRetry", HELLO_EVERY, HELLO_TRIES - 1, function()
+			if started then
+				timer.Remove("SCPCloud_HelloRetry")
+				return
+			end
+			Hello()
+		end)
 	end)
 end)
+
+-- Diagnostic client : scp_cloud_status en console
+concommand.Add("scp_cloud_status", function()
+	Log("État client : " .. tostring(SCPCloud.CL.state))
+	Log("Fichiers en attente : " .. tostring(SCPCloud.CL.missing or 0))
+	for _, e in ipairs(SCPCloud.CL.errors or {}) do
+		Log("  ERREUR " .. e)
+	end
+end, nil, "État du chargeur cloud de l'armurerie (côté client).")

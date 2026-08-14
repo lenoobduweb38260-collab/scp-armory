@@ -178,10 +178,36 @@ clients), et les images de fond du menu arrivent dans `data/scp_armory/`.
   transport se fait en HTTPS vers GitHub uniquement, tailles et contenus bornés.
 - En mode cloud, `scp_autoupdate` est inutile (le serveur repart toujours à jour) :
   ne l'installez pas en même temps.
-- La console serveur affiche `[ARMURERIE CLOUD] … armurerie chargée (commit …)` à
-  chaque démarrage : c'est votre preuve de mise à jour.
 - Le chargeur sait exécuter des addons composés de `lua/autorun/` + `lua/entities/`
   (le format de l'armurerie). Pour un addon d'une autre structure, demandez à Claude.
+
+### Vérifier que tout fonctionne (et dépanner)
+
+Au démarrage, la console serveur doit afficher, dans cet ordre :
+
+```
+[ARMURERIE CLOUD] Chargeur cloud v2 — démarrage dans 5 s.
+[ARMURERIE CLOUD] GitHub : armurerie EXÉCUTÉE (15 fichiers, commit abc1234). Serveur prêt.
+```
+
+puis, à chaque connexion d'un joueur :
+
+```
+[ARMURERIE CLOUD] Manifeste envoyé à Pseudo (STEAM_0:…).
+[ARMURERIE CLOUD] Envoi de N fichier(s) à Pseudo…      (première connexion seulement)
+[ARMURERIE CLOUD] Pseudo : armurerie chargée chez le joueur.
+```
+
+C'est cette **dernière ligne** qui compte pour le « en jeu » : le menu vit chez le
+joueur. Tant qu'elle n'apparaît pas pour vous, `!armurerie` ne montrera rien.
+
+Outils de diagnostic :
+
+- `scp_cloud_status` dans la console **serveur** : état, commit, erreurs d'exécution
+  détaillées, et l'état de chaque joueur (manifeste envoyé, fichiers envoyés, chargé…) ;
+- `scp_cloud_status` dans **votre console** (client, en jeu) : état côté joueur ;
+- les superadmins reçoivent l'état du cloud dans le chat ~15 s après leur connexion ;
+- `ERREUR : <fichier> — <message>` dans la console = envoyez cette ligne à Claude.
 
 ## Prérequis et limites
 
