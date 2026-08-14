@@ -17,8 +17,27 @@
 # ==========================================================================
 set -u
 
+# git ne doit JAMAIS attendre un mot de passe en silence au boot
+export GIT_TERMINAL_PROMPT=0
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MANIFEST="$SCRIPT_DIR/addons.txt"
+
+# --- jeton facultatif (dépôt GitHub privé) --------------------------------
+# Renseignez soit la variable d'environnement GITHUB_TOKEN, soit un fichier
+# github_token.txt à côté de ce script (voir LISEZMOI.md).
+TOKEN="${GITHUB_TOKEN:-}"
+if [ -z "$TOKEN" ] && [ -f "$SCRIPT_DIR/github_token.txt" ]; then
+	TOKEN="$(tr -d ' \r\n' < "$SCRIPT_DIR/github_token.txt")"
+fi
+
+auth_url() {
+	if [ -n "$TOKEN" ]; then
+		printf '%s' "$1" | sed -E "s#^https://github\.com/#https://${TOKEN}@github.com/#"
+	else
+		printf '%s' "$1"
+	fi
+}
 
 # --- localisation du dossier garrysmod/ -----------------------------------
 GMOD_DIR="${1:-${GMOD_DIR:-}}"
@@ -45,31 +64,52 @@ fi
 
 echo "[MAJ] Dossier serveur : $GMOD_DIR"
 entries=""
+ok=0
+ko=0
 
 # --- synchronisation des dépôts listés ------------------------------------
 while read -r url branch folder _; do
+	# addons.txt peut avoir été édité sous Windows : on retire les \r
+	url="${url//$'\r'/}"
+	branch="${branch:-}"; branch="${branch//$'\r'/}"
+	folder="${folder:-}"; folder="${folder//$'\r'/}"
+
 	case "$url" in ""|\#*) continue ;; esac
-	if [ -z "${branch:-}" ]; then
+	if [ -z "$branch" ]; then
 		echo "[MAJ] Ligne ignorée (branche manquante) : $url"
 		continue
 	fi
 	folder="${folder:-$(basename "$url" .git)}"
 	dest="$GMOD_DIR/addons/$folder"
+	cloneurl="$(auth_url "$url")"
 
 	if [ ! -d "$dest/.git" ]; then
 		echo "[MAJ] Installation de « $folder » (branche $branch)…"
-		git clone --branch "$branch" --single-branch "$url" "$dest" || { echo "[MAJ] ÉCHEC du clonage de $url"; continue; }
+		# </dev/null : git ne peut pas « manger » la suite d'addons.txt
+		if ! git clone --branch "$branch" --single-branch "$cloneurl" "$dest" < /dev/null; then
+			echo "[MAJ] ÉCHEC du clonage de $url"
+			echo "[MAJ]   → vérifiez : accès réseau, nom de la branche « $branch »,"
+			echo "[MAJ]     dépôt privé (jeton nécessaire, voir LISEZMOI.md)."
+			ko=$((ko + 1))
+			continue
+		fi
+		# le jeton éventuel n'est pas conservé dans la config du dépôt
+		git -C "$dest" remote set-url origin "$url" 2>/dev/null
 	else
 		echo "[MAJ] Mise à jour de « $folder »…"
-		git -C "$dest" fetch origin "$branch" || { echo "[MAJ] ÉCHEC du fetch de $folder (réseau ?)"; continue; }
-		git -C "$dest" checkout -q "$branch" 2>/dev/null || git -C "$dest" checkout -qb "$branch" "origin/$branch"
-		git -C "$dest" reset --hard "origin/$branch" >/dev/null
+		if ! git -C "$dest" fetch "$cloneurl" "$branch" < /dev/null; then
+			echo "[MAJ] ÉCHEC du fetch de $folder (réseau ? dépôt privé ? voir LISEZMOI.md)"
+			ko=$((ko + 1))
+			continue
+		fi
+		git -C "$dest" reset --hard FETCH_HEAD >/dev/null
 	fi
 
 	commit="$(git -C "$dest" rev-parse HEAD 2>/dev/null || echo "")"
 	repo="$(printf '%s' "$url" | sed -E 's#^(git@github\.com:|https?://github\.com/)##; s#\.git$##; s#/*$##')"
 	echo "[MAJ]   → $folder @ ${commit:0:7}"
 	entries="$entries${entries:+,}\"$folder\":{\"repo\":\"$repo\",\"branch\":\"$branch\",\"commit\":\"$commit\"}"
+	ok=$((ok + 1))
 
 	# Addon de contrôle livré dans le dépôt : installé/actualisé automatiquement
 	if [ -d "$dest/maj-auto/scp_autoupdate" ]; then
@@ -80,6 +120,9 @@ while read -r url branch folder _; do
 done < "$MANIFEST"
 
 # --- état local écrit pour l'addon de contrôle ----------------------------
+if [ -n "$TOKEN" ]; then
+	entries="$entries${entries:+,}\"_token\":\"$TOKEN\""
+fi
 mkdir -p "$GMOD_DIR/data/scp_autoupdate"
 printf '{%s}' "$entries" > "$GMOD_DIR/data/scp_autoupdate/etat.txt"
-echo "[MAJ] Terminé."
+echo "[MAJ] Terminé : $ok addon(s) synchronisé(s), $ko échec(s)."

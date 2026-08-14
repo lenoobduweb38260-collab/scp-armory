@@ -53,6 +53,12 @@ local function CheckAll(reporter)
 	checking = true
 	local pending = 0
 
+	-- Jeton facultatif écrit par le script de démarrage (dépôt privé)
+	local headers = { ["User-Agent"] = "gmod-scp-autoupdate" }
+	if isstring(state._token) and #state._token > 0 and #state._token <= 120 then
+		headers["Authorization"] = "Bearer " .. state._token
+	end
+
 	for folder, info in pairs(state) do
 		if istable(info) and isstring(info.repo) and isstring(info.branch) and isstring(info.commit)
 			and string.match(info.repo, "^[%w%.%-_]+/[%w%.%-_]+$") and #info.commit <= 64 then
@@ -62,7 +68,7 @@ local function CheckAll(reporter)
 				method = "GET",
 				url = "https://api.github.com/repos/" .. info.repo .. "/commits/"
 					.. string.gsub(info.branch, "[^%w%.%-_/]", ""),
-				headers = { ["User-Agent"] = "gmod-scp-autoupdate" },
+				headers = headers,
 				success = function(code, body)
 					pending = pending - 1
 					if pending <= 0 then checking = false end

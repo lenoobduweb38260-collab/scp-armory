@@ -1,5 +1,16 @@
 # Mise à jour automatique des addons (maj-auto)
 
+> ⚠️ **À lire en premier — qui fait quoi :**
+> - c'est le **script** (`update_addons.sh` / `.bat`) qui crée et met à jour les addons,
+>   et il ne le fait **que quand il est exécuté** : il doit être branché sur la commande
+>   de démarrage du serveur (exemples plus bas). Le lancer une fois à la main permet de
+>   tester immédiatement ;
+> - l'addon `scp_autoupdate`, lui, ne peut **rien créer** (sandbox du jeu) : il surveille
+>   et prévient, c'est tout ;
+> - placez le dossier `maj-auto/` **en dehors de `garrysmod/addons/`** (par exemple à la
+>   racine du serveur, à côté de `srcds_run`). S'il vit dans le dossier d'un addon
+>   synchronisé et que vous supprimez cet addon pour tester, le script disparaît avec !
+
 Ce dossier fait en sorte qu'**au démarrage ou au redémarrage du serveur**, tous les
 addons listés soient installés ou mis à jour automatiquement depuis GitHub :
 
@@ -22,10 +33,34 @@ La création/mise à jour des dossiers d'addons doit donc se faire **hors du jeu
 script lancé au démarrage du serveur (il a les droits complets sur le disque). L'addon
 `scp_autoupdate`, lui, reste dans la sandbox : il **lit** et **prévient**, c'est tout.
 
+## Test rapide (à faire en premier)
+
+Avant de brancher quoi que ce soit, lancez le script **une fois à la main** et lisez sa
+sortie — c'est elle qui dit ce qui se passe :
+
+```bash
+bash update_addons.sh /chemin/vers/garrysmod        # Linux
+update_addons.bat C:\chemin\vers\garrysmod          # Windows (double-clic possible)
+```
+
+Sortie attendue :
+```
+[MAJ] Dossier serveur : /…/garrysmod
+[MAJ] Installation de « scp-armory » (branche claude/ready-or-not-loadout-gbii3v)…
+[MAJ]   → scp-armory @ 1a2b3c4
+[MAJ]   → addon de contrôle scp_autoupdate actualisé
+[MAJ] Terminé : 1 addon(s) synchronisé(s), 0 échec(s).
+```
+
+Si l'addon n'apparaît pas dans `addons/`, la réponse est dans cette sortie :
+`ÉCHEC du clonage` (réseau, branche, dépôt privé → jeton), `git n'est pas installé`,
+`dossier garrysmod introuvable` (passez le chemin en argument), ou le script n'a tout
+simplement pas été lancé.
+
 ## Installation (Linux)
 
-1. Copiez le dossier `maj-auto/` sur la machine du serveur (n'importe où — le plus simple
-   est de le laisser dans `garrysmod/addons/scp-armory/maj-auto/` après un premier clonage).
+1. Copiez le dossier `maj-auto/` sur la machine du serveur, **hors de `addons/`**
+   (recommandé : à la racine du serveur, à côté de `srcds_run`).
 2. Rendez le script exécutable : `chmod +x update_addons.sh`
 3. Lancez-le **avant** srcds à chaque démarrage. Exemples :
 
@@ -98,6 +133,20 @@ Installé/actualisé automatiquement par le script. En jeu et en console :
 
 Sécurité : lecture seule, uniquement des requêtes GET vers `api.github.com`, réponses
 bornées, aucune écriture de fichier, commande réservée aux superadmins et limitée en cadence.
+
+## Dépôt privé (jeton facultatif)
+
+Le dépôt de l'armurerie est **public** : rien à configurer. Si un jour vous synchronisez
+un dépôt **privé**, créez un jeton GitHub à accès minimal (GitHub → Settings →
+Developer settings → *Fine-grained tokens* : accès au seul dépôt concerné, permission
+**Contents : Read-only**), puis :
+
+- soit collez-le dans un fichier `github_token.txt` à côté du script ;
+- soit exportez la variable d'environnement `GITHUB_TOKEN` avant de le lancer.
+
+Le script l'utilise pour cloner/mettre à jour (sans le conserver dans la config git) et
+le transmet à `scp_autoupdate` pour que la surveillance fonctionne aussi. Ne committez
+jamais ce fichier (il est ignoré par le dépôt).
 
 ## Prérequis et limites
 
