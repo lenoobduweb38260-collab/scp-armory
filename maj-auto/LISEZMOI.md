@@ -148,10 +148,45 @@ Le script l'utilise pour cloner/mettre à jour (sans le conserver dans la config
 le transmet à `scp_autoupdate` pour que la surveillance fonctionne aussi. Ne committez
 jamais ce fichier (il est ignoré par le dépôt).
 
+## Hébergeur externe sans accès aux commandes : le chargeur cloud
+
+Si votre hébergeur ne permet **ni SSH ni de modifier la commande de démarrage** (mutualisé
+classique), le script ci-dessus est inutilisable — utilisez à la place l'addon
+**`scp_cloudloader`** fourni dans ce dossier :
+
+1. Déposez **une seule fois** le dossier `scp_cloudloader/` dans `garrysmod/addons/`
+   via le gestionnaire de fichiers ou le FTP du panel.
+2. **N'installez pas** l'addon `scp-armory` à la main (le chargeur s'en occupe ; s'il
+   détecte l'addon sur le disque, il se désactive tout seul et l'addon disque prime).
+3. Redémarrez le serveur depuis le panel : c'est tout. **À chaque démarrage**, le
+   chargeur télécharge la dernière version du dépôt GitHub et l'exécute — chaque
+   modification poussée par Claude est donc appliquée au restart suivant, sans FTP.
+
+Comment ça marche, dans le respect de la sandbox du jeu : le chargeur ne crée aucun
+fichier dans `addons/` (interdit). Il télécharge les fichiers lua dans
+`data/scp_cloudloader/` (autorisé), les exécute en mémoire, envoie aux joueurs les
+fichiers client par le réseau (c'est déjà ainsi qu'un serveur GMod livre son lua aux
+clients), et les images de fond du menu arrivent dans `data/scp_armory/`.
+
+À savoir :
+
+- **Panne de GitHub** = démarrage sur la dernière copie en cache : le serveur n'est
+  jamais bloqué. Premier démarrage : il faut juste que le serveur ait accès à Internet.
+- **Confiance** : le serveur exécute le code du dépôt épinglé dans
+  `lua/scp_cloudloader/sv_loader.lua` (constantes `REPO` / `BRANCH`, modifiables).
+  C'est la même confiance que déposer l'addon par FTP — même code, même auteur — le
+  transport se fait en HTTPS vers GitHub uniquement, tailles et contenus bornés.
+- En mode cloud, `scp_autoupdate` est inutile (le serveur repart toujours à jour) :
+  ne l'installez pas en même temps.
+- La console serveur affiche `[ARMURERIE CLOUD] … armurerie chargée (commit …)` à
+  chaque démarrage : c'est votre preuve de mise à jour.
+- Le chargeur sait exécuter des addons composés de `lua/autorun/` + `lua/entities/`
+  (le format de l'armurerie). Pour un addon d'une autre structure, demandez à Claude.
+
 ## Prérequis et limites
 
-- **git** doit être installé sur la machine (`apt install git` / https://git-scm.com).
-- Il faut pouvoir modifier la **commande de démarrage** du serveur (SSH, systemd, panel
-  type Pterodactyl…). Sur un hébergeur mutualisé qui ne le permet pas : installez quand
-  même `scp_autoupdate` (copie du dossier dans `addons/`) — il vous dira quand mettre à
-  jour, et la mise à jour se fera par le gestionnaire de fichiers/FTP de l'hébergeur.
+- **Script `update_addons`** : git installé sur la machine et possibilité de modifier la
+  **commande de démarrage** (SSH, systemd, panel type Pterodactyl/WISP — beaucoup de
+  panels le permettent, cherchez « Startup command »).
+- **Chargeur cloud** : aucun prérequis côté hébergeur, juste l'accès Internet du serveur.
+- Dans les deux cas, le dépôt GitHub fait foi : les modifications locales sont écrasées.

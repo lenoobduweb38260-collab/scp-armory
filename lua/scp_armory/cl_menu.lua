@@ -49,9 +49,24 @@ local backBG = Color(255, 255, 255, 20)
 local SAVE_DIR = "scp_armory"
 local SAVE_FILE = SAVE_DIR .. "/loadout.txt"
 
--- Fonds d'ambiance (images générées, incluses dans l'addon)
-local MAT_RACKS = Material("scp_armory/bg_racks.png", "smooth")
-local MAT_TABLE = Material("scp_armory/bg_table.png", "smooth")
+-- Fonds d'ambiance : depuis materials/ (addon sur le disque) ou, en mode
+-- chargeur cloud, depuis data/scp_armory/ où le loader les télécharge.
+-- Résolution paresseuse et re-tentée : l'image peut arriver après ce fichier.
+local bgMats = {}
+local bgRetry = 0
+local function BackdropMat(name)
+	local m = bgMats[name]
+	if m and not m:IsError() then return m end
+	if RealTime() < bgRetry then return m end
+	bgRetry = RealTime() + 2
+
+	m = Material("scp_armory/" .. name, "smooth")
+	if m:IsError() and file.Exists("scp_armory/" .. name, "DATA") then
+		m = Material("data/scp_armory/" .. name, "smooth")
+	end
+	bgMats[name] = m
+	return m
+end
 
 local WEAPON_KEYS = { "primary", "secondary" }
 
@@ -254,10 +269,10 @@ local function OpenMenu()
 		if SCPArmory.Config.MenuScene ~= false then
 			bgBlend = Lerp(FrameTime() * 6, bgBlend, bgWeapon and 1 or 0)
 			if bgBlend < 0.99 then
-				DrawBackdrop(MAT_RACKS, w, h, 255 * (1 - bgBlend))
+				DrawBackdrop(BackdropMat("bg_racks.png"), w, h, 255 * (1 - bgBlend))
 			end
 			if bgBlend > 0.01 then
-				DrawBackdrop(MAT_TABLE, w, h, 255 * bgBlend)
+				DrawBackdrop(BackdropMat("bg_table.png"), w, h, 255 * bgBlend)
 			end
 		end
 
