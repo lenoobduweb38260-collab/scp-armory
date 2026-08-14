@@ -70,7 +70,53 @@ end
 
 -- Rayon d'arrondi des éléments selon le style (0 = angles nets)
 local function UIRadius(cartes)
-	return uiStyle == "cartes" and cartes or 0
+	if uiStyle == "cartes" then return cartes end
+	if uiStyle == "holo" then return math.min(cartes, 6) end
+	return 0
+end
+
+-- Thèmes « références » : lignes en boîtes bordées, pictogrammes, chevrons
+local function IsBoxTheme()
+	return uiStyle == "holo" or uiStyle == "cyber" or uiStyle == "sombre"
+end
+
+-- Marge droite des textes alignés à droite (place du chevron holo/cyber)
+local function RightPad()
+	return (uiStyle == "holo" or uiStyle == "cyber") and 28 or 12
+end
+
+-- Couleurs mutables des thèmes en boîtes (aucune allocation par frame)
+local boxLine = Color(190, 34, 28, 90)
+local boxBG = Color(10, 14, 22, 190)
+local chevCol = Color(190, 34, 28, 140)
+local panelBG = Color(8, 10, 14, 232)
+
+-- Pictogrammes vectoriels des emplacements sans modèle 3D (gilet, casque,
+-- apparence) pour les thèmes en boîtes, dessinés en rectangles
+local function DrawSlotIcon(kind, x, y, s, col)
+	surface.SetDrawColor(col.r, col.g, col.b, 210)
+	local u = s / 22
+	if kind == "armor" then
+		-- gilet : bretelles, plastron, ceinture
+		surface.DrawRect(x + 4 * u, y + 1 * u, 4 * u, 6 * u)
+		surface.DrawRect(x + 14 * u, y + 1 * u, 4 * u, 6 * u)
+		surface.DrawRect(x + 3 * u, y + 7 * u, 16 * u, 10 * u)
+		surface.DrawRect(x + 5 * u, y + 17 * u, 12 * u, 3 * u)
+	elseif kind == "helmet" then
+		-- casque : dôme en escalier, visière, jugulaire
+		surface.DrawRect(x + 7 * u, y + 2 * u, 8 * u, 3 * u)
+		surface.DrawRect(x + 4 * u, y + 5 * u, 14 * u, 8 * u)
+		surface.DrawRect(x + 3 * u, y + 13 * u, 16 * u, 3 * u)
+		surface.DrawRect(x + 15 * u, y + 16 * u, 3 * u, 5 * u)
+	else
+		-- silhouette (apparence) : tête, torse, bras
+		surface.DrawRect(x + 8 * u, y + 1 * u, 6 * u, 6 * u)
+		surface.DrawRect(x + 5 * u, y + 8 * u, 12 * u, 9 * u)
+		surface.DrawRect(x + 2 * u, y + 8 * u, 3 * u, 7 * u)
+		surface.DrawRect(x + 17 * u, y + 8 * u, 3 * u, 7 * u)
+		surface.DrawRect(x + 6 * u, y + 17 * u, 4 * u, 4 * u)
+		surface.DrawRect(x + 12 * u, y + 17 * u, 4 * u, 4 * u)
+	end
 end
 
 -- Habillage commun des lignes de la colonne : carte arrondie (cartes),
@@ -96,6 +142,42 @@ local function RowChrome(hf, w, h)
 		end
 		surface.SetDrawColor(COL.lineF)
 		surface.DrawRect(0, h - 1, w, 1)
+	elseif uiStyle == "holo" then
+		-- boîte arrondie à bordure lumineuse (bordure = boîte sous boîte)
+		boxLine.r, boxLine.g, boxLine.b = COL.red.r, COL.red.g, COL.red.b
+		boxLine.a = 70 + 150 * hf
+		draw.RoundedBox(6, 0, 0, w, h, boxLine)
+		boxBG.r = 4 + COL.red.r * 0.05
+		boxBG.g = 6 + COL.red.g * 0.06
+		boxBG.b = 8 + COL.red.b * 0.10
+		boxBG.a = 216 - 26 * hf
+		draw.RoundedBox(5, 1, 1, w - 2, h - 2, boxBG)
+		chevCol.r, chevCol.g, chevCol.b = COL.red.r, COL.red.g, COL.red.b
+		chevCol.a = 110 + 120 * hf
+		draw.SimpleText("›", "SCPArmory_RoN_Name", w - 13, h / 2 - 1, chevCol,
+			TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	elseif uiStyle == "cyber" then
+		surface.SetDrawColor(255, 255, 255, 8 + 10 * hf)
+		surface.DrawRect(0, 0, w, h)
+		if hf > 0.01 then
+			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 24 * hf)
+			surface.DrawRect(0, 0, w, h)
+		end
+		surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 55 + 170 * hf)
+		surface.DrawOutlinedRect(0, 0, w, h, 1)
+		chevCol.r, chevCol.g, chevCol.b = COL.red.r, COL.red.g, COL.red.b
+		chevCol.a = 110 + 120 * hf
+		draw.SimpleText("›", "SCPArmory_RoN_Name", w - 13, h / 2 - 1, chevCol,
+			TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	elseif uiStyle == "sombre" then
+		surface.SetDrawColor(255, 255, 255, 11 + 10 * hf)
+		surface.DrawRect(0, 0, w, h)
+		surface.SetDrawColor(255, 255, 255, 14 + 22 * hf)
+		surface.DrawOutlinedRect(0, 0, w, h, 1)
+		if hf > 0.01 then
+			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * hf)
+			surface.DrawRect(0, 0, 3, h)
+		end
 	else
 		rowBG.a = 8 + 14 * hf
 		draw.RoundedBox(8, 0, 0, w, h, rowBG)
@@ -269,8 +351,11 @@ local function OpenMenu()
 	EnsureFonts()
 	ApplyTheme()
 
-	-- Espacement des lignes selon le style : cartes espacées, listes serrées
-	local rowGap = (uiStyle == "cartes") and 5 or (uiStyle == "mw" and 2 or 0)
+	-- Espacement des lignes selon le style : cartes/boîtes espacées, listes serrées
+	local rowGap = (uiStyle == "cartes" and 5)
+		or (uiStyle == "mw" and 2)
+		or (IsBoxTheme() and 6)
+		or 0
 
 	local selection, autoApply, attSel = LoadSaved()
 	local plyModel = LocalPlayer():GetModel()
@@ -848,6 +933,45 @@ local function OpenMenu()
 			surface.SetDrawColor(COL.red)
 			surface.DrawRect(-18, -16, w + 34, 2)
 			DisableClipping(dc)
+		elseif uiStyle == "holo" then
+			-- panneau hologramme : fond teinté, bordure arrondie, coins marqués
+			local dc = DisableClipping(true)
+			local ph = s:GetTall() + 34
+			boxLine.r, boxLine.g, boxLine.b, boxLine.a = COL.red.r, COL.red.g, COL.red.b, 130
+			draw.RoundedBox(10, -19, -17, w + 36, ph, boxLine)
+			panelBG.r = 5 + COL.red.r * 0.04
+			panelBG.g = 7 + COL.red.g * 0.06
+			panelBG.b = 9 + COL.red.b * 0.10
+			draw.RoundedBox(9, -18, -16, w + 34, ph - 2, panelBG)
+			-- coins lumineux
+			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 230)
+			for _, c in ipairs({ { -19, -17, 1, 1 }, { w + 17, -17, -1, 1 },
+				{ -19, ph - 18, 1, -1 }, { w + 17, ph - 18, -1, -1 } }) do
+				local cx, cy, dx, dy = c[1], c[2], c[3], c[4]
+				surface.DrawRect(dx > 0 and cx or cx - 13, cy - 1, 14, 3)
+				surface.DrawRect(cx - 1, dy > 0 and cy or cy - 13, 3, 14)
+			end
+			DisableClipping(dc)
+		elseif uiStyle == "cyber" then
+			local dc = DisableClipping(true)
+			panelBG.r, panelBG.g, panelBG.b = 6, 9, 15
+			surface.SetDrawColor(panelBG)
+			surface.DrawRect(-18, -16, w + 34, s:GetTall() + 32)
+			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 150)
+			surface.DrawOutlinedRect(-18, -16, w + 34, s:GetTall() + 32, 1)
+			surface.SetDrawColor(COL.red)
+			surface.DrawRect(-18, -16, w + 34, 2)
+			DisableClipping(dc)
+		elseif uiStyle == "sombre" then
+			local dc = DisableClipping(true)
+			panelBG.r, panelBG.g, panelBG.b = 8, 9, 11
+			surface.SetDrawColor(panelBG)
+			surface.DrawRect(-18, -16, w + 34, s:GetTall() + 32)
+			surface.SetDrawColor(255, 255, 255, 18)
+			surface.DrawOutlinedRect(-18, -16, w + 34, s:GetTall() + 32, 1)
+			surface.SetDrawColor(COL.red)
+			surface.DrawRect(-18, -16, w + 34, 2)
+			DisableClipping(dc)
 		end
 
 		-- Balayage animé du titre à chaque changement d'écran
@@ -933,6 +1057,20 @@ local function OpenMenu()
 		if uiStyle == "cartes" then
 			draw.RoundedBox(12, 0, 0, w, h, COL.panel)
 			draw.RoundedBoxEx(12, 0, 0, w, 3, COL.red, true, true, false, false)
+		elseif uiStyle == "holo" then
+			boxLine.r, boxLine.g, boxLine.b, boxLine.a = COL.red.r, COL.red.g, COL.red.b, 130
+			draw.RoundedBox(8, 0, 0, w, h, boxLine)
+			panelBG.r = 5 + COL.red.r * 0.04
+			panelBG.g = 7 + COL.red.g * 0.06
+			panelBG.b = 9 + COL.red.b * 0.10
+			draw.RoundedBox(7, 1, 1, w - 2, h - 2, panelBG)
+		elseif uiStyle == "cyber" then
+			surface.SetDrawColor(COL.panel)
+			surface.DrawRect(0, 0, w, h)
+			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 150)
+			surface.DrawOutlinedRect(0, 0, w, h, 1)
+			surface.SetDrawColor(COL.red)
+			surface.DrawRect(0, 0, w, 2)
 		else
 			surface.SetDrawColor(COL.panel)
 			surface.DrawRect(0, 0, w, h)
@@ -1049,6 +1187,12 @@ local function OpenMenu()
 			surface.DrawRect(0, y + 16, w - 10, 2)
 			surface.SetDrawColor(COL.red)
 			surface.DrawRect(0, y + 16, s.barAnim[i] * (w - 10), 2)
+
+			-- Poignée de curseur au bout de la barre (thèmes en boîtes)
+			if IsBoxTheme() then
+				surface.SetDrawColor(COL.text)
+				surface.DrawRect(math.max(s.barAnim[i] * (w - 10) - 2, 0), y + 13, 4, 8)
+			end
 			y = y + 24
 		end
 	end
@@ -1087,15 +1231,25 @@ local function OpenMenu()
 		-- Respiration discrète au repos
 		local pulse = (1 - s.hf) * math.sin(RealTime() * 2.2) * 7
 
-		btnBG.r = math.Clamp(Lerp(s.hf, COL.red.r, COL.redHi.r) + pulse, 0, 255)
-		btnBG.g = math.Clamp(Lerp(s.hf, COL.red.g, COL.redHi.g) + pulse * 0.3, 0, 255)
-		btnBG.b = math.Clamp(Lerp(s.hf, COL.red.b, COL.redHi.b) + pulse * 0.3, 0, 255)
-		draw.RoundedBox(UIRadius(8), 0, 0, w, h, btnBG)
+		if uiStyle == "cyber" then
+			-- Bouton en contour lumineux, façon référence cyber
+			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 42 + 70 * s.hf + pulse * 2)
+			surface.DrawRect(0, 0, w, h)
+			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 220)
+			surface.DrawOutlinedRect(0, 0, w, h, 1)
+			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 90 + 100 * s.hf)
+			surface.DrawOutlinedRect(1, 1, w - 2, h - 2, 1)
+		else
+			btnBG.r = math.Clamp(Lerp(s.hf, COL.red.r, COL.redHi.r) + pulse, 0, 255)
+			btnBG.g = math.Clamp(Lerp(s.hf, COL.red.g, COL.redHi.g) + pulse * 0.3, 0, 255)
+			btnBG.b = math.Clamp(Lerp(s.hf, COL.red.b, COL.redHi.b) + pulse * 0.3, 0, 255)
+			draw.RoundedBox(UIRadius(8), 0, 0, w, h, btnBG)
 
-		-- Liseré blanc qui s'allume au survol
-		if s.hf > 0.02 then
-			surface.SetDrawColor(255, 255, 255, 60 * s.hf)
-			surface.DrawOutlinedRect(3, 3, w - 6, h - 6, 1)
+			-- Liseré blanc qui s'allume au survol
+			if s.hf > 0.02 then
+				surface.SetDrawColor(255, 255, 255, 60 * s.hf)
+				surface.DrawOutlinedRect(3, 3, w - 6, h - 6, 1)
+			end
 		end
 
 		draw.SimpleText(T("DÉPLOYER"), "SCPArmory_RoN_Btn", w / 2, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
@@ -1205,7 +1359,14 @@ local function OpenMenu()
 		pnl:DockMargin(0, 10, 10, 4)
 		pnl:SetTall(20)
 		pnl.Paint = function(_, w, h)
-			DrawSpacedText(label, "SCPArmory_RoN_Label", 0, 2, COL.faint, 2)
+			if uiStyle == "holo" or uiStyle == "cyber" then
+				-- barre verticale + libellé à la couleur d'accent (références)
+				surface.SetDrawColor(COL.red)
+				surface.DrawRect(0, 3, 3, 12)
+				DrawSpacedText(label, "SCPArmory_RoN_Label", 10, 2, COL.red, 2)
+			else
+				DrawSpacedText(label, "SCPArmory_RoN_Label", 0, 2, COL.faint, 2)
+			end
 			surface.SetDrawColor(COL.lineF)
 			surface.DrawRect(0, h - 1, w, 1)
 		end
@@ -1225,7 +1386,11 @@ local function OpenMenu()
 	-- Entrée de la vue d'ensemble : image de profil + catégorie + nom
 	local function AddOverviewEntry(slot, withImage)
 		local item = SCPArmory.GetItem(slot.pool, selection[slot.key])
-		local tall = withImage and 96 or 48
+
+		-- Thèmes en boîtes : disposition compacte des références
+		-- (icône à gauche, catégorie + nom à droite, chevron au bord)
+		local boxy = IsBoxTheme()
+		local tall = withImage and (boxy and 58 or 96) or (boxy and 52 or 48)
 
 		local btn = scroll:Add("DButton")
 		btn:Dock(TOP)
@@ -1235,8 +1400,13 @@ local function OpenMenu()
 
 		if withImage and item and not item.icon and HasModel(item) then
 			local icon = vgui.Create("DModelPanel", btn)
-			icon:SetPos(8, 4)
-			icon:SetSize(170, 46)
+			if boxy then
+				icon:SetPos(10, 6)
+				icon:SetSize(88, 46)
+			else
+				icon:SetPos(8, 4)
+				icon:SetSize(170, 46)
+			end
 			icon:SetModel(item.model)
 			icon:SetMouseInputEnabled(false)
 			FitModelSide(icon)
@@ -1249,13 +1419,33 @@ local function OpenMenu()
 			RowChrome(s.hf, w, h)
 
 			if withImage and item and item.icon then
-				SCPArmory.DrawWebIcon(item.icon, 8, 3, 170, 46)
+				if boxy then
+					SCPArmory.DrawWebIcon(item.icon, 10, 6, 88, 46)
+				else
+					SCPArmory.DrawWebIcon(item.icon, 8, 3, 170, 46)
+				end
 			end
 
 			-- Le texte glisse légèrement vers la droite au survol
 			local ox = 10 + math.Round(s.hf * 6)
 
-			if withImage then
+			if boxy and withImage then
+				local tx = 104 + math.Round(s.hf * 4)
+				draw.SimpleText(T(slot.label), "SCPArmory_RoN_Label", tx, 10, COL.dim)
+				DrawSpacedText(SCPArmory.FrUpper(item and item.name or T("— AUCUN —")), "SCPArmory_RoN_NameSm", tx, 26,
+					hov and COL.text or COL.soft, 1)
+				if item and item.ammo and item.ammo[1] then
+					draw.SimpleText("×" .. item.ammo[1].amount, "SCPArmory_RoN_Small", w - RightPad(), 10,
+						COL.faint, TEXT_ALIGN_RIGHT)
+				end
+			elseif boxy then
+				DrawSlotIcon(slot.key == "armor" and "armor" or "helmet",
+					14, h / 2 - 12, 24, hov and COL.text or COL.dim)
+				local tx = 50 + math.Round(s.hf * 4)
+				draw.SimpleText(T(slot.label), "SCPArmory_RoN_Label", tx, 8, COL.dim)
+				DrawSpacedText(SCPArmory.FrUpper(item and item.name or T("— AUCUN —")), "SCPArmory_RoN_NameSm", tx, 24,
+					hov and COL.text or COL.soft, 1)
+			elseif withImage then
 				draw.SimpleText(T(slot.label), "SCPArmory_RoN_Label", ox, 52, COL.dim)
 				DrawSpacedText(SCPArmory.FrUpper(item and item.name or T("— AUCUN —")), "SCPArmory_RoN_Name", ox, 66,
 					hov and COL.text or COL.soft, 1)
@@ -1325,7 +1515,7 @@ local function OpenMenu()
 
 			draw.SimpleText(string.format("%.1f KG", item.weight or 0), "SCPArmory_RoN_Small", ox, 32, COL.faint)
 			if item.ammo and item.ammo[1] then
-				draw.SimpleText("×" .. item.ammo[1].amount, "SCPArmory_RoN_Small", w - 12, 32,
+				draw.SimpleText("×" .. item.ammo[1].amount, "SCPArmory_RoN_Small", w - RightPad(), 32,
 					COL.faint, TEXT_ALIGN_RIGHT)
 			end
 		end
@@ -1558,7 +1748,7 @@ local function OpenMenu()
 				local ox = 12 + math.Round(s.hf * 6)
 				DrawSpacedText(att.name, "SCPArmory_RoN_NameSm", ox, 6,
 					(equipped or hov) and COL.text or COL.soft, 1)
-				draw.SimpleText(att.cat, "SCPArmory_RoN_Small", w - 12, 26, COL.red, TEXT_ALIGN_RIGHT)
+				draw.SimpleText(att.cat, "SCPArmory_RoN_Small", w - RightPad(), 26, COL.red, TEXT_ALIGN_RIGHT)
 			end
 			btn.OnCursorEntered = function() hoverAtt = att end
 			btn.DoClick = function() pick(att.id) end
@@ -1606,6 +1796,10 @@ local function OpenMenu()
 						s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
 						RowChrome(s.hf, w, h)
 						local ox = 12 + math.Round(s.hf * 6)
+						if IsBoxTheme() then
+							DrawSlotIcon("torso", 14, h / 2 - 12, 24, hov and COL.text or COL.dim)
+							ox = ox + 38
+						end
 						draw.SimpleText(SCPArmory.FrUpper(opt.name), "SCPArmory_RoN_Label", ox, 6, COL.dim)
 						DrawSpacedText(T("VARIANTE") .. " " .. (cur + 1) .. " / " .. opt.num, "SCPArmory_RoN_NameSm", ox, 22,
 							hov and COL.text or COL.soft, 1)
@@ -1651,7 +1845,7 @@ local function OpenMenu()
 					DrawSpacedText(T("VARIANTE") .. " " .. (v + 1), "SCPArmory_RoN_NameSm", ox, 12,
 						(equipped or hov) and COL.text or COL.soft, 1)
 					if equipped then
-						draw.SimpleText(T("ÉQUIPÉE"), "SCPArmory_RoN_Small", w - 12, 16, COL.red, TEXT_ALIGN_RIGHT)
+						draw.SimpleText(T("ÉQUIPÉE"), "SCPArmory_RoN_Small", w - RightPad(), 16, COL.red, TEXT_ALIGN_RIGHT)
 					end
 				end
 				row.DoClick = function()

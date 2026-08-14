@@ -462,19 +462,24 @@ function SCPArmory.OpenConfigMenu()
 
 	Section("INTERFACE")
 	Note("Style et couleur d'accent appliqués à tous les joueurs (pris en compte à l'ouverture de leur prochain menu).")
+	Note("Choisir un style règle aussi sa couleur signature — modifiable ensuite avec les curseurs.")
 
 	local themeSel = SCPArmory.Config.UITheme or "cartes"
 	do
+		-- Chaque style porte sa couleur signature, posée sur les curseurs au clic
 		local THEMES = {
-			{ code = "cartes", label = "CARTES (ACTUELLE)" },
-			{ code = "ron", label = "READY OR NOT" },
-			{ code = "mw", label = "MODERN WARFARE" },
+			{ code = "cartes", label = "CARTES", sig = { 190, 34, 28 } },
+			{ code = "ron", label = "READY OR NOT", sig = { 190, 34, 28 } },
+			{ code = "mw", label = "MODERN WARFARE", sig = { 201, 168, 60 } },
+			{ code = "holo", label = "HOLOGRAMME", sig = { 77, 178, 255 } },
+			{ code = "cyber", label = "CYBER SCP", sig = { 58, 160, 255 } },
+			{ code = "sombre", label = "SOMBRE TACTIQUE", sig = { 61, 125, 216 } },
 		}
 
 		local pnl = scroll:Add("DPanel")
 		pnl:Dock(TOP)
 		pnl:DockMargin(0, 8, 12, 0)
-		pnl:SetTall(28)
+		pnl:SetTall(56)
 		pnl.Paint = function(_, _, h)
 			draw.SimpleText("Style de l'interface", "SCPArmory_Cfg_Small",
 				0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
@@ -496,6 +501,9 @@ function SCPArmory.OpenConfigMenu()
 			end
 			b.DoClick = function()
 				themeSel = th.code
+				if nums.UIColorR then nums.UIColorR.value = th.sig[1] end
+				if nums.UIColorG then nums.UIColorG.value = th.sig[2] end
+				if nums.UIColorB then nums.UIColorB.value = th.sig[3] end
 				surface.PlaySound("ui/buttonclick.wav")
 			end
 			btns[i] = b
@@ -503,8 +511,10 @@ function SCPArmory.OpenConfigMenu()
 
 		pnl.PerformLayout = function(_, w)
 			for i, b in ipairs(btns) do
+				local col = (i - 1) % 3
+				local row = math.floor((i - 1) / 3)
 				b:SetSize(146, 24)
-				b:SetPos(w - (#btns - i + 1) * 152, 2)
+				b:SetPos(w - (3 - col) * 152, 2 + row * 28)
 			end
 		end
 	end
@@ -520,7 +530,9 @@ function SCPArmory.OpenConfigMenu()
 			{ 214, 128, 30 },  -- orange
 			{ 201, 168, 60 },  -- doré
 			{ 70, 150, 76 },   -- vert
-			{ 52, 122, 198 },  -- bleu
+			{ 77, 178, 255 },  -- bleu hologramme
+			{ 58, 160, 255 },  -- bleu cyber
+			{ 61, 125, 216 },  -- bleu acier
 			{ 126, 87, 194 },  -- violet
 			{ 46, 172, 165 },  -- turquoise
 			{ 150, 150, 155 }, -- acier

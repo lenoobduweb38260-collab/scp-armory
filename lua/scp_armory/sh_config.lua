@@ -56,7 +56,10 @@ SCPArmory.Config = {
 	-- Style de l'interface (choix dans la config en jeu) :
 	-- "cartes" = panneaux arrondis translucides (défaut),
 	-- "ron"    = Ready or Not épuré et plat,
-	-- "mw"     = Modern Warfare anguleux, lignes surlignées à la couleur d'accent
+	-- "mw"     = Modern Warfare anguleux, lignes surlignées à la couleur d'accent,
+	-- "holo"   = hologramme : boîtes bordées arrondies, chevrons, coins lumineux,
+	-- "cyber"  = cyber SCP : bordures vives sur fond nuit, bouton en contour,
+	-- "sombre" = tactique minimal : boîtes sombres, accent discret
 	UITheme = "cartes",
 
 	-- Couleur d'accent de l'interface, appliquée partout dans les menus

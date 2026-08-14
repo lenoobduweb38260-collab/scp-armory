@@ -374,7 +374,10 @@ local EDITABLE = {
 local VALID_LANGS = { fr = true, de = true, pl = true }
 
 -- Styles d'interface disponibles (cl_menu.lua)
-local VALID_THEMES = { cartes = true, ron = true, mw = true }
+local VALID_THEMES = {
+	cartes = true, ron = true, mw = true,
+	holo = true, cyber = true, sombre = true,
+}
 
 -- Transforme "Job A, Job B" (ou une table) en liste propre de noms de jobs
 -- (bornée : 24 jobs max par objet, 64 caractères max par nom)
