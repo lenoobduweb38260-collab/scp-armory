@@ -46,6 +46,66 @@ local btnBG = Color(190, 34, 28, 255)
 local flashBG = Color(255, 255, 255, 255)
 local backBG = Color(255, 255, 255, 20)
 
+-- ------------------------------------------------------------------ thèmes
+-- Style d'interface actif : "cartes" (panneaux arrondis), "ron" (Ready or
+-- Not plat et épuré), "mw" (Modern Warfare anguleux). Choisi dans la config.
+local uiStyle = "cartes"
+
+-- Applique le style et la couleur d'accent configurés : COL.red/redHi/amber
+-- sont mutées en place, donc toutes les références déjà prises restent bonnes
+local function ApplyTheme()
+	local s = SCPArmory.Config.UITheme
+	uiStyle = (s == "ron" or s == "mw") and s or "cartes"
+
+	local r, g, b = SCPArmory.AccentColor()
+	COL.red.r, COL.red.g, COL.red.b = r, g, b
+	COL.redHi.r = math.min(255, r + 35)
+	COL.redHi.g = math.min(255, g + 18)
+	COL.redHi.b = math.min(255, b + 16)
+	COL.amber.r = math.min(255, r + 65)
+	COL.amber.g = math.min(255, g + 142)
+	COL.amber.b = math.max(0, b - 28)
+	btnBG.r, btnBG.g, btnBG.b = r, g, b
+end
+
+-- Rayon d'arrondi des éléments selon le style (0 = angles nets)
+local function UIRadius(cartes)
+	return uiStyle == "cartes" and cartes or 0
+end
+
+-- Habillage commun des lignes de la colonne : carte arrondie (cartes),
+-- ligne plate à séparateur (ron), surlignage accent anguleux (mw)
+local function RowChrome(hf, w, h)
+	if uiStyle == "ron" then
+		if hf > 0.01 then
+			surface.SetDrawColor(255, 255, 255, 6 * hf)
+			surface.DrawRect(0, 0, w, h)
+			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * hf)
+			surface.DrawRect(0, 0, 2, h)
+		end
+		surface.SetDrawColor(COL.lineF)
+		surface.DrawRect(0, h - 1, w, 1)
+	elseif uiStyle == "mw" then
+		surface.SetDrawColor(255, 255, 255, 4)
+		surface.DrawRect(0, 0, w, h)
+		if hf > 0.01 then
+			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 36 * hf)
+			surface.DrawRect(0, 0, w, h)
+			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * hf)
+			surface.DrawRect(0, 0, 3, h)
+		end
+		surface.SetDrawColor(COL.lineF)
+		surface.DrawRect(0, h - 1, w, 1)
+	else
+		rowBG.a = 8 + 14 * hf
+		draw.RoundedBox(8, 0, 0, w, h, rowBG)
+		if hf > 0.01 then
+			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * hf)
+			surface.DrawRect(0, 3, 3, h - 6)
+		end
+	end
+end
+
 local SAVE_DIR = "scp_armory"
 local SAVE_FILE = SAVE_DIR .. "/loadout.txt"
 
@@ -207,6 +267,10 @@ local function OpenMenu()
 	if IsValid(activeMenu) then activeMenu:Remove() end
 
 	EnsureFonts()
+	ApplyTheme()
+
+	-- Espacement des lignes selon le style : cartes espacées, listes serrées
+	local rowGap = (uiStyle == "cartes") and 5 or (uiStyle == "mw" and 2 or 0)
 
 	local selection, autoApply, attSel = LoadSaved()
 	local plyModel = LocalPlayer():GetModel()
@@ -288,16 +352,22 @@ local function OpenMenu()
 	frame.PaintOver = function(_, w, h)
 		local rt = RealTime()
 
-		-- Barre d'accent en dégradé rouge → ambre en haut de l'écran
-		local bands = 40
-		local bw = w / bands
-		for i = 0, bands - 1 do
-			local f = i / (bands - 1)
-			surface.SetDrawColor(
-				Lerp(f, COL.red.r, COL.amber.r),
-				Lerp(f, COL.red.g, COL.amber.g),
-				Lerp(f, COL.red.b, COL.amber.b), 230)
-			surface.DrawRect(i * bw, 0, math.ceil(bw), 3)
+		-- Barre d'accent en haut de l'écran : dégradé (cartes), trait net (mw),
+		-- rien (ron, fidèle au jeu d'origine)
+		if uiStyle == "cartes" then
+			local bands = 40
+			local bw = w / bands
+			for i = 0, bands - 1 do
+				local f = i / (bands - 1)
+				surface.SetDrawColor(
+					Lerp(f, COL.red.r, COL.amber.r),
+					Lerp(f, COL.red.g, COL.amber.g),
+					Lerp(f, COL.red.b, COL.amber.b), 230)
+				surface.DrawRect(i * bw, 0, math.ceil(bw), 3)
+			end
+		elseif uiStyle == "mw" then
+			surface.SetDrawColor(COL.red)
+			surface.DrawRect(0, 0, w, 2)
 		end
 
 		-- Vignette cinématique haut/bas
@@ -738,7 +808,7 @@ local function OpenMenu()
 		cfgBtn:SetText("")
 		cfgBtn.Paint = function(s, w, h)
 			rowBG.a = s:IsHovered() and 44 or 22
-			draw.RoundedBox(6, 0, 0, w, h, rowBG)
+			draw.RoundedBox(UIRadius(6), 0, 0, w, h, rowBG)
 			draw.SimpleText(T("CONFIGURATION"), "SCPArmory_RoN_Label", w / 2, h / 2,
 				s:IsHovered() and COL.text or COL.dim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
@@ -763,12 +833,22 @@ local function OpenMenu()
 	local redAnim = Color(COL.red.r, COL.red.g, COL.red.b, 255)
 
 	column.Paint = function(s, w)
-		-- Carte translucide arrondie derrière toute la colonne, avec un
-		-- liseré d'accent en dégradé sur le bord supérieur (style « carte »)
-		local dc = DisableClipping(true)
-		draw.RoundedBox(14, -18, -16, w + 34, s:GetTall() + 32, COL.card)
-		draw.RoundedBoxEx(14, -18, -16, w + 34, 4, COL.red, true, true, false, false)
-		DisableClipping(dc)
+		-- Fond de colonne selon le style : carte translucide arrondie
+		-- (cartes), panneau anguleux à liseré d'accent (mw), rien (ron —
+		-- le dégradé sombre du fond suffit, comme dans le jeu d'origine)
+		if uiStyle == "cartes" then
+			local dc = DisableClipping(true)
+			draw.RoundedBox(14, -18, -16, w + 34, s:GetTall() + 32, COL.card)
+			draw.RoundedBoxEx(14, -18, -16, w + 34, 4, COL.red, true, true, false, false)
+			DisableClipping(dc)
+		elseif uiStyle == "mw" then
+			local dc = DisableClipping(true)
+			surface.SetDrawColor(COL.card)
+			surface.DrawRect(-18, -16, w + 34, s:GetTall() + 32)
+			surface.SetDrawColor(COL.red)
+			surface.DrawRect(-18, -16, w + 34, 2)
+			DisableClipping(dc)
+		end
 
 		-- Balayage animé du titre à chaque changement d'écran
 		local tf = Ease((RealTime() - (s.animT or 0)) / 0.35)
@@ -850,8 +930,15 @@ local function OpenMenu()
 	infoDesc:SetMouseInputEnabled(false)
 
 	infoPanel.Paint = function(_, w, h)
-		draw.RoundedBox(12, 0, 0, w, h, COL.panel)
-		draw.RoundedBoxEx(12, 0, 0, w, 3, COL.red, true, true, false, false)
+		if uiStyle == "cartes" then
+			draw.RoundedBox(12, 0, 0, w, h, COL.panel)
+			draw.RoundedBoxEx(12, 0, 0, w, 3, COL.red, true, true, false, false)
+		else
+			surface.SetDrawColor(COL.panel)
+			surface.DrawRect(0, 0, w, h)
+			surface.SetDrawColor(COL.red)
+			surface.DrawRect(0, 0, w, 2)
+		end
 
 		local item = CurWeaponItem()
 		if not item then
@@ -1003,7 +1090,7 @@ local function OpenMenu()
 		btnBG.r = math.Clamp(Lerp(s.hf, COL.red.r, COL.redHi.r) + pulse, 0, 255)
 		btnBG.g = math.Clamp(Lerp(s.hf, COL.red.g, COL.redHi.g) + pulse * 0.3, 0, 255)
 		btnBG.b = math.Clamp(Lerp(s.hf, COL.red.b, COL.redHi.b) + pulse * 0.3, 0, 255)
-		draw.RoundedBox(8, 0, 0, w, h, btnBG)
+		draw.RoundedBox(UIRadius(8), 0, 0, w, h, btnBG)
 
 		-- Liseré blanc qui s'allume au survol
 		if s.hf > 0.02 then
@@ -1018,7 +1105,7 @@ local function OpenMenu()
 			local fa = 1 - (RealTime() - s.flashT) / 0.25
 			if fa > 0 then
 				flashBG.a = 170 * fa
-				draw.RoundedBox(8, 0, 0, w, h, flashBG)
+				draw.RoundedBox(UIRadius(8), 0, 0, w, h, flashBG)
 			end
 		end
 	end
@@ -1096,7 +1183,14 @@ local function OpenMenu()
 		s.hf = Lerp(FrameTime() * 10, s.hf or 0, s:IsHovered() and 1 or 0)
 
 		backBG.a = 18 + 34 * s.hf
-		draw.RoundedBox(8, 0, 0, w, h, backBG)
+		draw.RoundedBox(UIRadius(8), 0, 0, w, h, backBG)
+		if uiStyle ~= "cartes" then
+			surface.SetDrawColor(
+				Lerp(s.hf, COL.line.r, COL.text.r),
+				Lerp(s.hf, COL.line.g, COL.text.g),
+				Lerp(s.hf, COL.line.b, COL.text.b), 255)
+			surface.DrawOutlinedRect(0, 0, w, h, 1)
+		end
 		draw.SimpleText(T("RETOUR"), "SCPArmory_RoN_Btn", w / 2 - 12, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		draw.SimpleText("ESC", "SCPArmory_RoN_Small", w - 10, h / 2, COL.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 	end
@@ -1135,7 +1229,7 @@ local function OpenMenu()
 
 		local btn = scroll:Add("DButton")
 		btn:Dock(TOP)
-		btn:DockMargin(0, 0, 10, 5)
+		btn:DockMargin(0, 0, 10, rowGap)
 		btn:SetTall(tall)
 		btn:SetText("")
 
@@ -1152,12 +1246,7 @@ local function OpenMenu()
 			local hov = s:IsHovered()
 			s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
 
-			rowBG.a = 8 + 14 * s.hf
-			draw.RoundedBox(8, 0, 0, w, h, rowBG)
-			if s.hf > 0.01 then
-				surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * s.hf)
-				surface.DrawRect(0, 3, 3, h - 6)
-			end
+			RowChrome(s.hf, w, h)
 
 			if withImage and item and item.icon then
 				SCPArmory.DrawWebIcon(item.icon, 8, 3, 170, 46)
@@ -1203,7 +1292,7 @@ local function OpenMenu()
 
 		local btn = scroll:Add("DButton")
 		btn:Dock(TOP)
-		btn:DockMargin(0, 0, 10, 5)
+		btn:DockMargin(0, 0, 10, rowGap)
 		btn:SetTall(58)
 		btn:SetText("")
 
@@ -1220,12 +1309,7 @@ local function OpenMenu()
 			local hov = s:IsHovered()
 			s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
 
-			rowBG.a = 8 + 14 * s.hf
-			draw.RoundedBox(8, 0, 0, w, h, rowBG)
-			if s.hf > 0.01 then
-				surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * s.hf)
-				surface.DrawRect(0, 3, 3, h - 6)
-			end
+			RowChrome(s.hf, w, h)
 			if equipped then
 				surface.SetDrawColor(COL.red)
 				surface.DrawRect(0, 3, 3, h - 6)
@@ -1329,12 +1413,11 @@ local function OpenMenu()
 		-- Ligne de l'arme : cliquer pour la remplacer
 		local wbtn = scroll:Add("DButton")
 		wbtn:Dock(TOP)
-		wbtn:DockMargin(0, 0, 10, 5)
+		wbtn:DockMargin(0, 0, 10, rowGap)
 		wbtn:SetTall(62)
 		wbtn:SetText("")
 		wbtn.Paint = function(s, w, h)
-			rowBG.a = s:IsHovered() and 22 or 8
-			draw.RoundedBox(8, 0, 0, w, h, rowBG)
+			RowChrome(s:IsHovered() and 1 or 0, w, h)
 			surface.SetDrawColor(COL.red)
 			surface.DrawRect(0, 3, 3, h - 6)
 			draw.SimpleText(T(slotDef.label) .. "  —  " .. T("CHANGER D'ARME"), "SCPArmory_RoN_Label", 12, 8,
@@ -1370,7 +1453,7 @@ local function OpenMenu()
 		for _, aslot in ipairs(slots) do
 			local btn = scroll:Add("DButton")
 			btn:Dock(TOP)
-			btn:DockMargin(0, 0, 10, 5)
+			btn:DockMargin(0, 0, 10, rowGap)
 			btn:SetTall(52)
 			btn:SetText("")
 			btn.Paint = function(s, w, h)
@@ -1379,12 +1462,7 @@ local function OpenMenu()
 				local installed = attSel[curWeaponKey][aslot.index]
 				local name = installed and SCPArmory.FrUpper(SCPArmory.ARC9Bridge.AttName(installed)) or T("—  VIDE  —")
 
-				rowBG.a = 8 + 14 * s.hf
-				draw.RoundedBox(8, 0, 0, w, h, rowBG)
-				if s.hf > 0.01 then
-					surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * s.hf)
-					surface.DrawRect(0, 3, 3, h - 6)
-				end
+				RowChrome(s.hf, w, h)
 
 				local ox = 12 + math.Round(s.hf * 6)
 				draw.SimpleText(aslot.name, "SCPArmory_RoN_Label", ox, 6, COL.dim)
@@ -1408,7 +1486,7 @@ local function OpenMenu()
 			clean:SetText("")
 			clean.Paint = function(s, w, h)
 				rowBG.a = s:IsHovered() and 34 or 14
-				draw.RoundedBox(8, 0, 0, w, h, rowBG)
+				draw.RoundedBox(UIRadius(8), 0, 0, w, h, rowBG)
 				draw.SimpleText(T("RETIRER TOUS LES ACCESSOIRES"), "SCPArmory_RoN_Label", w / 2, h / 2,
 					COL.soft, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
@@ -1439,13 +1517,12 @@ local function OpenMenu()
 		-- Ligne « aucun »
 		local noneBtn = scroll:Add("DButton")
 		noneBtn:Dock(TOP)
-		noneBtn:DockMargin(0, 0, 10, 5)
+		noneBtn:DockMargin(0, 0, 10, rowGap)
 		noneBtn:SetTall(40)
 		noneBtn:SetText("")
 		noneBtn.Paint = function(s, w, h)
 			local equipped = attSel[curWeaponKey][attSlot.index] == nil
-			rowBG.a = s:IsHovered() and 22 or 8
-			draw.RoundedBox(8, 0, 0, w, h, rowBG)
+			RowChrome(s:IsHovered() and 1 or 0, w, h)
 			if equipped then
 				surface.SetDrawColor(COL.red)
 				surface.DrawRect(0, 3, 3, h - 6)
@@ -1464,7 +1541,7 @@ local function OpenMenu()
 		for _, att in ipairs(list) do
 			local btn = scroll:Add("DButton")
 			btn:Dock(TOP)
-			btn:DockMargin(0, 0, 10, 5)
+			btn:DockMargin(0, 0, 10, rowGap)
 			btn:SetTall(44)
 			btn:SetText("")
 			btn.Paint = function(s, w, h)
@@ -1472,12 +1549,7 @@ local function OpenMenu()
 				local hov = s:IsHovered()
 				s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
 
-				rowBG.a = 8 + 14 * s.hf
-				draw.RoundedBox(8, 0, 0, w, h, rowBG)
-				if s.hf > 0.01 then
-					surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * s.hf)
-					surface.DrawRect(0, 3, 3, h - 6)
-				end
+				RowChrome(s.hf, w, h)
 				if equipped then
 					surface.SetDrawColor(COL.red)
 					surface.DrawRect(0, 3, 3, h - 6)
@@ -1526,18 +1598,13 @@ local function OpenMenu()
 
 					local btn = scroll:Add("DButton")
 					btn:Dock(TOP)
-					btn:DockMargin(0, 0, 10, 5)
+					btn:DockMargin(0, 0, 10, rowGap)
 					btn:SetTall(48)
 					btn:SetText("")
 					btn.Paint = function(s, w, h)
 						local hov = s:IsHovered()
 						s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
-						if s.hf > 0.01 then
-							surface.SetDrawColor(255, 255, 255, 6 * s.hf)
-							surface.DrawRect(0, 0, w, h)
-							surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * s.hf)
-							surface.DrawRect(0, 3, 3, h - 6)
-						end
+						RowChrome(s.hf, w, h)
 						local ox = 12 + math.Round(s.hf * 6)
 						draw.SimpleText(SCPArmory.FrUpper(opt.name), "SCPArmory_RoN_Label", ox, 6, COL.dim)
 						DrawSpacedText(T("VARIANTE") .. " " .. (cur + 1) .. " / " .. opt.num, "SCPArmory_RoN_NameSm", ox, 22,
@@ -1566,7 +1633,7 @@ local function OpenMenu()
 			for v = 0, bgSlot.num - 1 do
 				local row = scroll:Add("DButton")
 				row:Dock(TOP)
-				row:DockMargin(0, 0, 10, 5)
+				row:DockMargin(0, 0, 10, rowGap)
 				row:SetTall(44)
 				row:SetText("")
 				row.Paint = function(s, w, h)
@@ -1574,12 +1641,7 @@ local function OpenMenu()
 					local hov = s:IsHovered()
 					s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
 
-					rowBG.a = 8 + 14 * s.hf
-					draw.RoundedBox(8, 0, 0, w, h, rowBG)
-					if s.hf > 0.01 then
-						surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * s.hf)
-						surface.DrawRect(0, 3, 3, h - 6)
-					end
+					RowChrome(s.hf, w, h)
 					if equipped then
 						surface.SetDrawColor(COL.red)
 						surface.DrawRect(0, 3, 3, h - 6)

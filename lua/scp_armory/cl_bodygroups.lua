@@ -26,6 +26,13 @@ local function T(s) return SCPArmory.T(s) end
 local function OpenBGMenu()
 	if IsValid(activeBG) then activeBG:Remove() end
 
+	-- Couleur d'accent configurée, appliquée aussi à ce panneau
+	local ar, ag, ab = SCPArmory.AccentColor()
+	COL.red.r, COL.red.g, COL.red.b = ar, ag, ab
+	COL.redHi.r = math.min(255, ar + 35)
+	COL.redHi.g = math.min(255, ag + 18)
+	COL.redHi.b = math.min(255, ab + 16)
+
 	-- Bodygroups du playermodel autorisés par la configuration
 	local opts = {}
 	for _, bg in ipairs(LocalPlayer():GetBodyGroups() or {}) do

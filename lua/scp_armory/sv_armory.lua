@@ -364,10 +364,17 @@ local EDITABLE = {
 	MaxArmor           = "number",
 	LockerModel        = "string",
 	Language           = "string",
+	UITheme            = "string",
+	UIColorR           = "number",
+	UIColorG           = "number",
+	UIColorB           = "number",
 }
 
 -- Langues d'interface disponibles (sh_lang.lua)
 local VALID_LANGS = { fr = true, de = true, pl = true }
+
+-- Styles d'interface disponibles (cl_menu.lua)
+local VALID_THEMES = { cartes = true, ron = true, mw = true }
 
 -- Transforme "Job A, Job B" (ou une table) en liste propre de noms de jobs
 -- (bornée : 24 jobs max par objet, 64 caractères max par nom)
@@ -399,6 +406,9 @@ local NUM_BOUNDS = {
 	BaseRunSpeed     = { 50, 2000 },
 	MaxArmor         = { 1, 1000 },
 	LogRetentionDays = { 0, 365 },
+	UIColorR         = { 0, 255 },
+	UIColorG         = { 0, 255 },
+	UIColorB         = { 0, 255 },
 }
 
 local function ApplyOverrides(data)
@@ -420,6 +430,11 @@ local function ApplyOverrides(data)
 	-- La langue ne peut être qu'une des langues traduites
 	if not VALID_LANGS[SCPArmory.Config.Language] then
 		SCPArmory.Config.Language = "fr"
+	end
+
+	-- Le style d'interface ne peut être qu'un des styles existants
+	if not VALID_THEMES[SCPArmory.Config.UITheme] then
+		SCPArmory.Config.UITheme = "cartes"
 	end
 
 	-- Icônes : stockées même si l'objet n'existe pas encore

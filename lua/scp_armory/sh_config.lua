@@ -53,6 +53,18 @@ SCPArmory.Config = {
 	-- Langue de l'interface : "fr", "de" ou "pl" (choix dans la config en jeu)
 	Language = "fr",
 
+	-- Style de l'interface (choix dans la config en jeu) :
+	-- "cartes" = panneaux arrondis translucides (défaut),
+	-- "ron"    = Ready or Not épuré et plat,
+	-- "mw"     = Modern Warfare anguleux, lignes surlignées à la couleur d'accent
+	UITheme = "cartes",
+
+	-- Couleur d'accent de l'interface, appliquée partout dans les menus
+	-- (rouge Fondation par défaut ; réglable dans la config en jeu)
+	UIColorR = 190,
+	UIColorG = 34,
+	UIColorB = 28,
+
 	-- Séquence de pose de l'opérateur dans le menu (bras croisés si dispo)
 	PreviewPose = "pose_standing_02",
 
@@ -109,6 +121,14 @@ function SCPArmory.FrUpper(s)
 	upperCount = upperCount + 1
 
 	return out
+end
+
+-- Couleur d'accent configurée, bornée — utilisée par tous les panneaux
+function SCPArmory.AccentColor()
+	local c = SCPArmory.Config
+	return math.Clamp(math.floor(tonumber(c.UIColorR) or 190), 0, 255),
+		math.Clamp(math.floor(tonumber(c.UIColorG) or 34), 0, 255),
+		math.Clamp(math.floor(tonumber(c.UIColorB) or 28), 0, 255)
 end
 
 -- Bodygroups des playermodels que les joueurs ont le droit de modifier

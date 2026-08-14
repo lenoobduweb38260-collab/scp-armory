@@ -119,6 +119,11 @@ function SCPArmory.OpenConfigMenu()
 
 	if IsValid(activeConfig) then activeConfig:Remove() end
 
+	-- Couleur d'accent configurée, appliquée aussi à ce panneau
+	local ar, ag, ab = SCPArmory.AccentColor()
+	COL.red = Color(ar, ag, ab)
+	COL.redHi = Color(math.min(255, ar + 35), math.min(255, ag + 18), math.min(255, ab + 16))
+
 	local W = math.min(1020, ScrW() - 80)
 	local H = math.min(760, ScrH() - 60)
 
@@ -453,6 +458,118 @@ function SCPArmory.OpenConfigMenu()
 		end
 	end
 
+	-- ------------------------------------------ interface : style + couleur
+
+	Section("INTERFACE")
+	Note("Style et couleur d'accent appliqués à tous les joueurs (pris en compte à l'ouverture de leur prochain menu).")
+
+	local themeSel = SCPArmory.Config.UITheme or "cartes"
+	do
+		local THEMES = {
+			{ code = "cartes", label = "CARTES (ACTUELLE)" },
+			{ code = "ron", label = "READY OR NOT" },
+			{ code = "mw", label = "MODERN WARFARE" },
+		}
+
+		local pnl = scroll:Add("DPanel")
+		pnl:Dock(TOP)
+		pnl:DockMargin(0, 8, 12, 0)
+		pnl:SetTall(28)
+		pnl.Paint = function(_, _, h)
+			draw.SimpleText("Style de l'interface", "SCPArmory_Cfg_Small",
+				0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		end
+
+		local btns = {}
+		for i, th in ipairs(THEMES) do
+			local b = vgui.Create("DButton", pnl)
+			b:SetText("")
+			b.Paint = function(s, w, h)
+				local on = (themeSel == th.code)
+				draw.RoundedBox(6, 0, 0, w, h, on and COL.red or COL.field)
+				if not on then
+					surface.SetDrawColor(s:IsHovered() and COL.text or COL.line)
+					surface.DrawOutlinedRect(0, 0, w, h, 1)
+				end
+				draw.SimpleText(th.label, "SCPArmory_Cfg_Small", w / 2, h / 2,
+					on and COL.text or COL.soft, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			end
+			b.DoClick = function()
+				themeSel = th.code
+				surface.PlaySound("ui/buttonclick.wav")
+			end
+			btns[i] = b
+		end
+
+		pnl.PerformLayout = function(_, w)
+			for i, b in ipairs(btns) do
+				b:SetSize(146, 24)
+				b:SetPos(w - (#btns - i + 1) * 152, 2)
+			end
+		end
+	end
+
+	AddNumber("UIColorR", "Couleur d'accent — ROUGE", 0, 255)
+	AddNumber("UIColorG", "Couleur d'accent — VERT", 0, 255)
+	AddNumber("UIColorB", "Couleur d'accent — BLEU", 0, 255)
+
+	-- Aperçu en direct + couleurs prédéfinies (un clic règle les trois curseurs)
+	do
+		local PRESETS = {
+			{ 190, 34, 28 },   -- rouge Fondation
+			{ 214, 128, 30 },  -- orange
+			{ 201, 168, 60 },  -- doré
+			{ 70, 150, 76 },   -- vert
+			{ 52, 122, 198 },  -- bleu
+			{ 126, 87, 194 },  -- violet
+			{ 46, 172, 165 },  -- turquoise
+			{ 150, 150, 155 }, -- acier
+		}
+
+		local pnl = scroll:Add("DPanel")
+		pnl:Dock(TOP)
+		pnl:DockMargin(0, 8, 12, 0)
+		pnl:SetTall(30)
+		pnl.Paint = function(_, w, h)
+			draw.SimpleText("Aperçu + couleurs prédéfinies", "SCPArmory_Cfg_Small",
+				0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			-- Pastille d'aperçu, lue en direct sur les trois curseurs
+			local r = nums.UIColorR and nums.UIColorR.value or 190
+			local g = nums.UIColorG and nums.UIColorG.value or 34
+			local b = nums.UIColorB and nums.UIColorB.value or 28
+			surface.SetDrawColor(r, g, b, 255)
+			surface.DrawRect(w - 26, 4, 22, 22)
+			surface.SetDrawColor(COL.line)
+			surface.DrawOutlinedRect(w - 26, 4, 22, 22, 1)
+		end
+
+		local swBtns = {}
+		for i, p in ipairs(PRESETS) do
+			local b = vgui.Create("DButton", pnl)
+			b:SetText("")
+			b.Paint = function(s, w, h)
+				surface.SetDrawColor(p[1], p[2], p[3], 255)
+				surface.DrawRect(0, 0, w, h)
+				surface.SetDrawColor(s:IsHovered() and COL.text or COL.line)
+				surface.DrawOutlinedRect(0, 0, w, h, 1)
+			end
+			b.DoClick = function()
+				if nums.UIColorR then nums.UIColorR.value = p[1] end
+				if nums.UIColorG then nums.UIColorG.value = p[2] end
+				if nums.UIColorB then nums.UIColorB.value = p[3] end
+				surface.PlaySound("ui/buttonclick.wav")
+			end
+			swBtns[i] = b
+		end
+
+		pnl.PerformLayout = function(_, w)
+			for i, b in ipairs(swBtns) do
+				b:SetSize(22, 22)
+				b:SetPos(w - 34 - (#swBtns - i + 1) * 28, 4)
+			end
+		end
+	end
+
 	Section("JOURNAUX")
 	AddCheck("LogToFile", "Écrire les logs dans data/scp_armory/logs/ (un fichier par jour)")
 	AddCheck("LogToConsole", "Afficher les logs dans la console serveur")
@@ -630,6 +747,7 @@ function SCPArmory.OpenConfigMenu()
 		end
 		payload.config.LockerModel = lockerEntry:GetValue()
 		payload.config.Language = langSel
+		payload.config.UITheme = themeSel
 
 		for key, entry in pairs(iconEntries) do
 			local url = string.Trim(entry:GetValue() or "")
