@@ -153,6 +153,29 @@ local function DrawSlotIcon(kind, x, y, s, col)
 		surface.DrawRect(x + 4 * u, y + 5 * u, 14 * u, 8 * u)
 		surface.DrawRect(x + 3 * u, y + 13 * u, 16 * u, 3 * u)
 		surface.DrawRect(x + 15 * u, y + 16 * u, 3 * u, 5 * u)
+	elseif kind == "rifle" then
+		-- fusil : crosse, corps, canon, chargeur, poignée
+		surface.DrawRect(x + 1 * u, y + 12 * u, 4 * u, 5 * u)
+		surface.DrawRect(x + 4 * u, y + 9 * u, 13 * u, 4 * u)
+		surface.DrawRect(x + 17 * u, y + 10 * u, 4 * u, 2 * u)
+		surface.DrawRect(x + 5 * u, y + 6 * u, 3 * u, 3 * u)
+		surface.DrawRect(x + 10 * u, y + 13 * u, 3 * u, 6 * u)
+		surface.DrawRect(x + 15 * u, y + 13 * u, 3 * u, 4 * u)
+	elseif kind == "shield" then
+		-- bouclier : écusson en escalier
+		surface.DrawRect(x + 4 * u, y + 2 * u, 14 * u, 5 * u)
+		surface.DrawRect(x + 5 * u, y + 7 * u, 12 * u, 5 * u)
+		surface.DrawRect(x + 7 * u, y + 12 * u, 8 * u, 5 * u)
+		surface.DrawRect(x + 9 * u, y + 17 * u, 4 * u, 3 * u)
+	elseif kind == "gear" then
+		-- engrenage : bloc central, quatre dents, axe évidé
+		surface.DrawRect(x + 6 * u, y + 6 * u, 10 * u, 10 * u)
+		surface.DrawRect(x + 9 * u, y + 2 * u, 4 * u, 4 * u)
+		surface.DrawRect(x + 9 * u, y + 16 * u, 4 * u, 4 * u)
+		surface.DrawRect(x + 2 * u, y + 9 * u, 4 * u, 4 * u)
+		surface.DrawRect(x + 16 * u, y + 9 * u, 4 * u, 4 * u)
+		surface.SetDrawColor(10, 13, 18, 255)
+		surface.DrawRect(x + 9 * u, y + 9 * u, 4 * u, 4 * u)
 	else
 		-- silhouette (apparence) : tête, torse, bras
 		surface.DrawRect(x + 8 * u, y + 1 * u, 6 * u, 6 * u)
@@ -404,7 +427,8 @@ local function OpenMenu()
 	if jobName == "" then jobName = "Opérateur" end
 
 	-- Modes : "overview" (LOADOUT), "modify" (MODIFY WEAPON),
-	-- "select" (choix d'un objet), "attselect" (choix d'un accessoire)
+	-- "select" (choix d'un objet), "attselect" (choix d'un accessoire),
+	-- "bgselect" (variante d'apparence), "section" (catégorie du hub légion)
 	local mode = "overview"
 	local curWeaponKey = "primary"
 	local selectSlot = nil
@@ -413,6 +437,20 @@ local function OpenMenu()
 	local bgSlot = nil
 	local hoverItem = nil
 	local hoverAtt = nil
+
+	-- Thème légion : la vue d'ensemble est un hub de navigation (comme la
+	-- référence) ; les listes d'équipement vivent dans des écrans de section
+	local legionSection = "armement"
+	local LEGION_LABELS = {
+		armement = "ARMEMENT",
+		protection = "PROTECTION",
+		apparence = "APPARENCE",
+	}
+
+	-- Écran « racine » des listes : le hub en légion, la vue d'ensemble sinon
+	local function OverviewMode()
+		return uiStyle == "legion" and "section" or "overview"
+	end
 
 	local function CurWeaponItem()
 		return SCPArmory.GetItem(curWeaponKey, selection[curWeaponKey])
@@ -1046,6 +1084,11 @@ local function OpenMenu()
 			DrawSpacedText(mode == "modify" and T("MODIFIER L'ARME") or T("CHOIX D'ACCESSOIRE"),
 				"SCPArmory_RoN_Label", 28, 48, redCol, 2)
 			draw.SimpleText(T(SlotByKey(curWeaponKey).label), "SCPArmory_RoN_Label", 0, 82, COL.dim)
+		elseif mode == "section" then
+			DrawSpacedText(T(LEGION_LABELS[legionSection] or ""), "SCPArmory_RoN_Big", 0, 8, COL.text, 3)
+			surface.SetDrawColor(COL.red)
+			surface.DrawRect(0, 52, barW, 3)
+			DrawSpacedText(T("SÉLECTION D'ÉQUIPEMENT"), "SCPArmory_RoN_Label", 28, 48, redCol, 2)
 		else
 			local title = (mode == "bgselect") and SCPArmory.FrUpper(bgSlot and bgSlot.name or "")
 				or (selectSlot and T(selectSlot.label) or "")
@@ -1164,6 +1207,107 @@ local function OpenMenu()
 			end
 		else
 			draw.SimpleText(T("ARME NON ARC9 — PAS DE RAIL"), "SCPArmory_RoN_Small", 16, y, COL.faint)
+		end
+	end
+
+	-- ---------------------- panneau APERÇU LOADOUT du thème légion (droite)
+
+	local recap = nil
+	local recapModels = {}
+	local RebuildRecap = function() end
+
+	if uiStyle == "legion" then
+		local rw = math.Clamp(math.floor(ScrW() * 0.20), 300, 360)
+		local rh = 470
+		recap = vgui.Create("DPanel", frame)
+		recap:SetSize(rw, rh)
+		recap:SetPos(ScrW() - rw - 42, 108)
+		recap:SetMouseInputEnabled(false)
+
+		recap.Paint = function(s, w, h)
+			texCol.r, texCol.g, texCol.b, texCol.a = 255, 255, 255, 255
+			Draw9(BackdropMat("holo_panel.png"), 0, 0, w, h, 512, 512, 48, 22, texCol)
+			DrawSpacedText(T("APERÇU LOADOUT"), "SCPArmory_RoN_Label", 24, 20, COL.red, 2)
+			surface.SetDrawColor(COL.lineF)
+			surface.DrawRect(24, 38, w - 48, 1)
+
+			local y = 48
+			for _, wk in ipairs(WEAPON_KEYS) do
+				local item = SCPArmory.GetItem(wk, selection[wk])
+				draw.SimpleText(T(SlotByKey(wk).label), "SCPArmory_RoN_Small", 24, y, COL.dim)
+				draw.SimpleText(SCPArmory.FrUpper(item and item.name or "—"), "SCPArmory_RoN_NameSm",
+					24, y + 14, COL.text)
+				y = y + 100 -- la silhouette 3D occupe l'espace en dessous
+			end
+
+			DrawSpacedText(T("ÉQUIPEMENT"), "SCPArmory_RoN_Small", 24, y, COL.dim, 1)
+			y = y + 16
+			for _, key in ipairs({ "tactical1", "tactical2", "grenade" }) do
+				local item = SCPArmory.GetItem(SlotByKey(key).pool, selection[key])
+				draw.SimpleText(item and item.name or "—", "SCPArmory_RoN_Small", 32, y,
+					item and COL.soft or COL.faint)
+				y = y + 16
+			end
+
+			y = y + 6
+			DrawSpacedText(T("PROTECTION"), "SCPArmory_RoN_Small", 24, y, COL.dim, 1)
+			y = y + 16
+			for _, key in ipairs({ "armor", "helmet" }) do
+				local item = SCPArmory.GetItem(SlotByKey(key).pool, selection[key])
+				draw.SimpleText(item and item.name or "—", "SCPArmory_RoN_Small", 32, y,
+					item and COL.soft or COL.faint)
+				y = y + 16
+			end
+
+			-- Poids total (recalcul limité, comme le bloc du bas)
+			local stats = s.statsCache
+			if not stats or (s.statsNext or 0) < RealTime() then
+				s.statsCache = SCPArmory.ComputeStats(selection)
+				s.statsNext = RealTime() + 0.25
+				stats = s.statsCache
+			end
+			local by = h - 46
+			draw.SimpleText(T("POIDS LOADOUT"), "SCPArmory_RoN_Small", 24, by, COL.dim)
+			draw.SimpleText(string.format("%.1f KG", stats.weight), "SCPArmory_RoN_Small",
+				w - 24, by, COL.text, TEXT_ALIGN_RIGHT)
+			surface.SetDrawColor(COL.lineF)
+			surface.DrawRect(24, by + 18, w - 48, 3)
+			surface.SetDrawColor(COL.red)
+			surface.DrawRect(24, by + 18, math.Clamp(stats.weight / 30, 0, 1) * (w - 48), 3)
+		end
+
+		-- Recrée les silhouettes des armes quand la sélection change
+		RebuildRecap = function()
+			for _, p in ipairs(recapModels) do
+				if IsValid(p) then p:Remove() end
+			end
+			recapModels = {}
+			if not recap:IsVisible() then return end
+
+			local rw2 = recap:GetWide()
+			local y = 48
+			for _, wk in ipairs(WEAPON_KEYS) do
+				local item = SCPArmory.GetItem(wk, selection[wk])
+				if item and item.icon then
+					local pnl = vgui.Create("DPanel", recap)
+					pnl:SetPos(24, y + 32)
+					pnl:SetSize(rw2 - 48, 56)
+					pnl:SetMouseInputEnabled(false)
+					pnl.Paint = function(_, w2, h2)
+						SCPArmory.DrawWebIcon(item.icon, 0, 0, w2, h2)
+					end
+					table.insert(recapModels, pnl)
+				elseif HasModel(item) then
+					local mp = vgui.Create("DModelPanel", recap)
+					mp:SetPos(24, y + 32)
+					mp:SetSize(rw2 - 48, 56)
+					mp:SetModel(item.model)
+					mp:SetMouseInputEnabled(false)
+					FitModelSide(mp)
+					table.insert(recapModels, mp)
+				end
+				y = y + 100
+			end
 		end
 	end
 
@@ -1321,7 +1465,13 @@ local function OpenMenu()
 			end
 		end
 
-		draw.SimpleText(T("DÉPLOYER"), "SCPArmory_RoN_Btn", w / 2, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		if uiStyle == "legion" then
+			-- Bouton à sous-titre, comme la référence (« REJOINDRE LE COMBAT »)
+			draw.SimpleText(T("DÉPLOYER"), "SCPArmory_RoN_Btn", w / 2, h / 2 - 7, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			draw.SimpleText(T("REJOINDRE LE COMBAT"), "SCPArmory_RoN_Small", w / 2, h / 2 + 10, COL.soft, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		else
+			draw.SimpleText(T("DÉPLOYER"), "SCPArmory_RoN_Btn", w / 2, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		end
 
 		-- Flash au clic
 		if s.flashT then
@@ -1376,12 +1526,14 @@ local function OpenMenu()
 			mode = "modify"
 			attSlot = nil
 		elseif mode == "bgselect" then
-			mode = "overview"
+			mode = OverviewMode()
 			bgSlot = nil
 		elseif mode == "select" then
 			mode = selectReturn
 			selectSlot = nil
 		elseif mode == "modify" then
+			mode = OverviewMode()
+		elseif mode == "section" then
 			mode = "overview"
 		else
 			CloseMenu()
@@ -1419,7 +1571,9 @@ local function OpenMenu()
 				surface.DrawOutlinedRect(0, 0, w, h, 1)
 			end
 		end
-		draw.SimpleText(T("RETOUR"), "SCPArmory_RoN_Btn", w / 2 - 12, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		-- Sur le hub légion, le bouton quitte le menu (comme la référence)
+		local backLbl = (uiStyle == "legion" and mode == "overview") and T("QUITTER") or T("RETOUR")
+		draw.SimpleText(backLbl, "SCPArmory_RoN_Btn", w / 2 - 12, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		draw.SimpleText("ESC", "SCPArmory_RoN_Small", w - 10, h / 2, COL.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 	end
 	backBtn.DoClick = GoBack
@@ -1543,7 +1697,7 @@ local function OpenMenu()
 			else
 				mode = "select"
 				selectSlot = slot
-				selectReturn = "overview"
+				selectReturn = OverviewMode()
 				hoverItem = item
 			end
 			RebuildColumn()
@@ -1829,12 +1983,99 @@ local function OpenMenu()
 		end
 	end
 
+	-- Bodygroups autorisés du playermodel (vue d'ensemble + écran APPARENCE)
+	local function CollectBGOpts()
+		local bgOpts = {}
+		for _, bg in ipairs(LocalPlayer():GetBodyGroups() or {}) do
+			local nm = string.lower(tostring(bg.name or ""))
+			if (bg.num or 0) > 1 and SCPArmory.AllowedBodygroups and SCPArmory.AllowedBodygroups[nm] then
+				table.insert(bgOpts, { name = nm, id = bg.id, num = bg.num })
+			end
+		end
+		return bgOpts
+	end
+
+	local function AddBGRow(opt)
+		local cur = (selection.bg and selection.bg[opt.name])
+			or LocalPlayer():GetBodygroup(opt.id) or 0
+
+		local btn = scroll:Add("DButton")
+		btn:Dock(TOP)
+		btn:DockMargin(0, 0, 10, rowGap)
+		btn:SetTall(48)
+		btn:SetText("")
+		btn.Paint = function(s, w, h)
+			local hov = s:IsHovered()
+			s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
+			RowChrome(s.hf, w, h)
+			local ox = 12 + math.Round(s.hf * 6)
+			if IsBoxTheme() then
+				DrawSlotIcon("torso", 14, h / 2 - 12, 24, hov and COL.text or COL.dim)
+				ox = ox + 38
+			end
+			draw.SimpleText(SCPArmory.FrUpper(opt.name), "SCPArmory_RoN_Label", ox, 6, COL.dim)
+			DrawSpacedText(T("VARIANTE") .. " " .. (cur + 1) .. " / " .. opt.num, "SCPArmory_RoN_NameSm", ox, 22,
+				hov and COL.text or COL.soft, 1)
+		end
+		btn.DoClick = function()
+			mode = "bgselect"
+			bgSlot = opt
+			surface.PlaySound("ui/buttonclick.wav")
+			RebuildColumn()
+		end
+	end
+
+	-- Grande carte de navigation du hub légion (icône, titre, sous-titre)
+	local function AddNavCard(icon, title, subtitle, onClick)
+		local btn = scroll:Add("DButton")
+		btn:Dock(TOP)
+		btn:DockMargin(0, 0, 10, rowGap + 3)
+		btn:SetTall(62)
+		btn:SetText("")
+		btn.Paint = function(s, w, h)
+			local hov = s:IsHovered()
+			s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
+			RowChrome(s.hf, w, h)
+			DrawSlotIcon(icon, 16, h / 2 - 14, 28, hov and COL.text or COL.soft)
+			local tx = 58 + math.Round(s.hf * 4)
+			DrawSpacedText(title, "SCPArmory_RoN_Name", tx, 12, hov and COL.text or COL.soft, 1)
+			draw.SimpleText(subtitle, "SCPArmory_RoN_Small", tx, 34, COL.dim)
+		end
+		btn.DoClick = function()
+			surface.PlaySound("ui/buttonclick.wav")
+			onClick()
+		end
+	end
+
 	RebuildColumn = function()
 		scroll:Clear()
 		hoverAtt = nil
 		column.animT = RealTime()
 
-		if mode == "overview" then
+		if mode == "overview" and uiStyle == "legion" then
+			-- Hub de navigation façon référence légion : grandes cartes
+			descLabel:SetText("")
+			AddNavCard("rifle", T("ARMEMENT"), T("CONFIGURER VOS ARMES"), function()
+				mode = "section"
+				legionSection = "armement"
+				RebuildColumn()
+			end)
+			AddNavCard("shield", T("PROTECTION"), T("CONFIGURER VOTRE PROTECTION"), function()
+				mode = "section"
+				legionSection = "protection"
+				RebuildColumn()
+			end)
+			AddNavCard("torso", T("APPARENCE"), T("PERSONNALISER VOTRE APPARENCE"), function()
+				mode = "section"
+				legionSection = "apparence"
+				RebuildColumn()
+			end)
+			if LocalPlayer():IsSuperAdmin() then
+				AddNavCard("gear", T("CONFIGURATION"), T("PARAMÈTRES ET PRÉFÉRENCES"), function()
+					if SCPArmory.OpenConfigMenu then SCPArmory.OpenConfigMenu() end
+				end)
+			end
+		elseif mode == "overview" then
 			descLabel:SetText("")
 			AddSection("ARMEMENT")
 			for _, key in ipairs({ "primary", "secondary", "tactical1", "tactical2", "grenade" }) do
@@ -1847,43 +2088,34 @@ local function OpenMenu()
 			end
 
 			-- Apparence : bodygroups autorisés par la config, style RoN
-			local bgOpts = {}
-			for _, bg in ipairs(LocalPlayer():GetBodyGroups() or {}) do
-				local nm = string.lower(tostring(bg.name or ""))
-				if (bg.num or 0) > 1 and SCPArmory.AllowedBodygroups and SCPArmory.AllowedBodygroups[nm] then
-					table.insert(bgOpts, { name = nm, id = bg.id, num = bg.num })
-				end
-			end
+			local bgOpts = CollectBGOpts()
 			if #bgOpts > 0 then
 				AddSection("APPARENCE")
 				for _, opt in ipairs(bgOpts) do
-					local cur = (selection.bg and selection.bg[opt.name])
-						or LocalPlayer():GetBodygroup(opt.id) or 0
+					AddBGRow(opt)
+				end
+			end
+		elseif mode == "section" then
+			-- Écran de catégorie du hub légion : mêmes lignes que la vue
+			-- d'ensemble classique, avec un en-tête retour
+			descLabel:SetText("")
+			AddBackHeader(T(LEGION_LABELS[legionSection] or ""), GoBack)
 
-					local btn = scroll:Add("DButton")
-					btn:Dock(TOP)
-					btn:DockMargin(0, 0, 10, rowGap)
-					btn:SetTall(48)
-					btn:SetText("")
-					btn.Paint = function(s, w, h)
-						local hov = s:IsHovered()
-						s.hf = Lerp(FrameTime() * 10, s.hf or 0, hov and 1 or 0)
-						RowChrome(s.hf, w, h)
-						local ox = 12 + math.Round(s.hf * 6)
-						if IsBoxTheme() then
-							DrawSlotIcon("torso", 14, h / 2 - 12, 24, hov and COL.text or COL.dim)
-							ox = ox + 38
-						end
-						draw.SimpleText(SCPArmory.FrUpper(opt.name), "SCPArmory_RoN_Label", ox, 6, COL.dim)
-						DrawSpacedText(T("VARIANTE") .. " " .. (cur + 1) .. " / " .. opt.num, "SCPArmory_RoN_NameSm", ox, 22,
-							hov and COL.text or COL.soft, 1)
-					end
-					btn.DoClick = function()
-						mode = "bgselect"
-						bgSlot = opt
-						surface.PlaySound("ui/buttonclick.wav")
-						RebuildColumn()
-					end
+			if legionSection == "armement" then
+				for _, key in ipairs({ "primary", "secondary", "tactical1", "tactical2", "grenade" }) do
+					AddOverviewEntry(SlotByKey(key), true)
+				end
+			elseif legionSection == "protection" then
+				for _, key in ipairs({ "armor", "helmet" }) do
+					AddOverviewEntry(SlotByKey(key), false)
+				end
+			else
+				local bgOpts = CollectBGOpts()
+				if #bgOpts == 0 then
+					AddNote("Aucun bodygroup autorisé sur votre modèle.")
+				end
+				for _, opt in ipairs(bgOpts) do
+					AddBGRow(opt)
 				end
 			end
 		elseif mode == "modify" then
@@ -1925,7 +2157,7 @@ local function OpenMenu()
 				row.DoClick = function()
 					selection.bg = selection.bg or {}
 					selection.bg[bgSlot.name] = v
-					mode = "overview"
+					mode = OverviewMode()
 					bgSlot = nil
 					surface.PlaySound("ui/buttonclick.wav")
 					RebuildColumn()
@@ -1945,6 +2177,12 @@ local function OpenMenu()
 		if infoPanel:IsVisible() then
 			local item = CurWeaponItem()
 			infoDesc:SetText(item and item.desc or "")
+		end
+
+		-- Panneau APERÇU LOADOUT (hub légion) : visible sur le hub uniquement
+		if recap then
+			recap:SetVisible(mode == "overview")
+			RebuildRecap()
 		end
 
 		-- Apparition en cascade des lignes de la colonne

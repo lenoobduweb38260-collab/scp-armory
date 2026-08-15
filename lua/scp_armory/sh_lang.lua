@@ -75,6 +75,15 @@ SCPArmory.Translations = {
 			= "Das Konfigurationsmenü ist Superadmins vorbehalten.",
 		["Configuration enregistrée et diffusée à tous les joueurs."]
 			= "Konfiguration gespeichert und an alle Spieler gesendet.",
+		["CONFIGURER VOS ARMES"] = "IHRE WAFFEN KONFIGURIEREN",
+		["CONFIGURER VOTRE PROTECTION"] = "IHREN SCHUTZ KONFIGURIEREN",
+		["PERSONNALISER VOTRE APPARENCE"] = "IHR AUSSEHEN ANPASSEN",
+		["PARAMÈTRES ET PRÉFÉRENCES"] = "EINSTELLUNGEN UND PRÄFERENZEN",
+		["APERÇU LOADOUT"] = "LOADOUT-ÜBERSICHT",
+		["POIDS LOADOUT"] = "LOADOUT-GEWICHT",
+		["ÉQUIPEMENT"] = "AUSRÜSTUNG",
+		["QUITTER"] = "VERLASSEN",
+		["REJOINDRE LE COMBAT"] = "IN DEN KAMPF",
 	},
 
 	pl = {
@@ -146,6 +155,15 @@ SCPArmory.Translations = {
 			= "Panel konfiguracji jest zarezerwowany dla superadminów.",
 		["Configuration enregistrée et diffusée à tous les joueurs."]
 			= "Konfiguracja zapisana i rozesłana do wszystkich graczy.",
+		["CONFIGURER VOS ARMES"] = "SKONFIGURUJ SWOJĄ BROŃ",
+		["CONFIGURER VOTRE PROTECTION"] = "SKONFIGURUJ SWOJĄ OCHRONĘ",
+		["PERSONNALISER VOTRE APPARENCE"] = "DOSTOSUJ SWÓJ WYGLĄD",
+		["PARAMÈTRES ET PRÉFÉRENCES"] = "USTAWIENIA I PREFERENCJE",
+		["APERÇU LOADOUT"] = "PODGLĄD WYPOSAŻENIA",
+		["POIDS LOADOUT"] = "WAGA WYPOSAŻENIA",
+		["ÉQUIPEMENT"] = "WYPOSAŻENIE",
+		["QUITTER"] = "WYJDŹ",
+		["REJOINDRE LE COMBAT"] = "DO WALKI",
 	},
 }
 
