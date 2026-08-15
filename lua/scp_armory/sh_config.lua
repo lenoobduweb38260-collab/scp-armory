@@ -59,7 +59,9 @@ SCPArmory.Config = {
 	-- "mw"     = Modern Warfare anguleux, lignes surlignées à la couleur d'accent,
 	-- "holo"   = hologramme : boîtes bordées arrondies, chevrons, coins lumineux,
 	-- "cyber"  = cyber SCP : bordures vives sur fond nuit, bouton en contour,
-	-- "sombre" = tactique minimal : boîtes sombres, accent discret
+	-- "sombre" = tactique minimal : boîtes sombres, accent discret,
+	-- "legion" = hologramme légion : panneaux et plaques dessinés par des
+	--            images générées (materials/scp_armory/holo_*), écusson
 	UITheme = "cartes",
 
 	-- Couleur d'accent de l'interface, appliquée partout dans les menus

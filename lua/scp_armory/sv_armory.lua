@@ -376,7 +376,7 @@ local VALID_LANGS = { fr = true, de = true, pl = true }
 -- Styles d'interface disponibles (cl_menu.lua)
 local VALID_THEMES = {
 	cartes = true, ron = true, mw = true,
-	holo = true, cyber = true, sombre = true,
+	holo = true, cyber = true, sombre = true, legion = true,
 }
 
 -- Transforme "Job A, Job B" (ou une table) en liste propre de noms de jobs

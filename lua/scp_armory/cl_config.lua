@@ -474,12 +474,13 @@ function SCPArmory.OpenConfigMenu()
 			{ code = "holo", label = "HOLOGRAMME", sig = { 77, 178, 255 } },
 			{ code = "cyber", label = "CYBER SCP", sig = { 58, 160, 255 } },
 			{ code = "sombre", label = "SOMBRE TACTIQUE", sig = { 61, 125, 216 } },
+			{ code = "legion", label = "LÉGION HOLO", sig = { 96, 168, 255 } },
 		}
 
 		local pnl = scroll:Add("DPanel")
 		pnl:Dock(TOP)
 		pnl:DockMargin(0, 8, 12, 0)
-		pnl:SetTall(56)
+		pnl:SetTall(2 + math.ceil(#THEMES / 3) * 28)
 		pnl.Paint = function(_, _, h)
 			draw.SimpleText("Style de l'interface", "SCPArmory_Cfg_Small",
 				0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)

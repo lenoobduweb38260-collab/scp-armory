@@ -46,6 +46,26 @@ local btnBG = Color(190, 34, 28, 255)
 local flashBG = Color(255, 255, 255, 255)
 local backBG = Color(255, 255, 255, 20)
 
+-- Matériaux (fonds et habillage du thème légion) : depuis materials/ (addon
+-- sur le disque) ou, en mode chargeur cloud, depuis data/scp_armory/ où le
+-- loader les télécharge. Résolution paresseuse et re-tentée : l'image peut
+-- arriver après le chargement de ce fichier.
+local bgMats = {}
+local bgRetry = 0
+local function BackdropMat(name)
+	local m = bgMats[name]
+	if m and not m:IsError() then return m end
+	if RealTime() < bgRetry then return m end
+	bgRetry = RealTime() + 2
+
+	m = Material("scp_armory/" .. name, "smooth")
+	if m:IsError() and file.Exists("scp_armory/" .. name, "DATA") then
+		m = Material("data/scp_armory/" .. name, "smooth")
+	end
+	bgMats[name] = m
+	return m
+end
+
 -- ------------------------------------------------------------------ thèmes
 -- Style d'interface actif : "cartes" (panneaux arrondis), "ron" (Ready or
 -- Not plat et épuré), "mw" (Modern Warfare anguleux). Choisi dans la config.
@@ -77,12 +97,37 @@ end
 
 -- Thèmes « références » : lignes en boîtes bordées, pictogrammes, chevrons
 local function IsBoxTheme()
-	return uiStyle == "holo" or uiStyle == "cyber" or uiStyle == "sombre"
+	return uiStyle == "holo" or uiStyle == "cyber" or uiStyle == "sombre" or uiStyle == "legion"
 end
 
--- Marge droite des textes alignés à droite (place du chevron holo/cyber)
+-- Marge droite des textes alignés à droite (place du chevron)
 local function RightPad()
-	return (uiStyle == "holo" or uiStyle == "cyber") and 28 or 12
+	return (uiStyle == "holo" or uiStyle == "cyber" or uiStyle == "legion") and 28 or 12
+end
+
+-- Dessin en 9 tranches d'une texture à bords (panneaux/plaques du thème légion) :
+-- coins fidèles, bords et centre étirés. b = bord en pixels texture,
+-- sb = bord affiché en pixels écran.
+local texCol = Color(255, 255, 255, 255)
+
+local function Draw9(mat, x, y, w, h, tw, th, b, sb, col)
+	if not mat or mat:IsError() then return end
+	surface.SetDrawColor(col.r, col.g, col.b, col.a)
+	surface.SetMaterial(mat)
+	sb = math.min(sb, math.floor(w / 2), math.floor(h / 2))
+	local u, v = b / tw, b / th
+
+	surface.DrawTexturedRectUV(x, y, sb, sb, 0, 0, u, v)
+	surface.DrawTexturedRectUV(x + w - sb, y, sb, sb, 1 - u, 0, 1, v)
+	surface.DrawTexturedRectUV(x, y + h - sb, sb, sb, 0, 1 - v, u, 1)
+	surface.DrawTexturedRectUV(x + w - sb, y + h - sb, sb, sb, 1 - u, 1 - v, 1, 1)
+
+	surface.DrawTexturedRectUV(x + sb, y, w - sb * 2, sb, u, 0, 1 - u, v)
+	surface.DrawTexturedRectUV(x + sb, y + h - sb, w - sb * 2, sb, u, 1 - v, 1 - u, 1)
+	surface.DrawTexturedRectUV(x, y + sb, sb, h - sb * 2, 0, v, u, 1 - v)
+	surface.DrawTexturedRectUV(x + w - sb, y + sb, sb, h - sb * 2, 1 - u, v, 1, 1 - v)
+
+	surface.DrawTexturedRectUV(x + sb, y + sb, w - sb * 2, h - sb * 2, u, v, 1 - u, 1 - v)
 end
 
 -- Couleurs mutables des thèmes en boîtes (aucune allocation par frame)
@@ -178,6 +223,18 @@ local function RowChrome(hf, w, h)
 			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * hf)
 			surface.DrawRect(0, 0, 3, h)
 		end
+	elseif uiStyle == "legion" then
+		-- plaques holographiques générées (materials/scp_armory/holo_plate*)
+		texCol.r, texCol.g, texCol.b, texCol.a = 255, 255, 255, 255
+		Draw9(BackdropMat("holo_plate.png"), 0, 0, w, h, 256, 64, 20, 12, texCol)
+		if hf > 0.01 then
+			texCol.a = 255 * hf
+			Draw9(BackdropMat("holo_plate_hi.png"), 0, 0, w, h, 256, 64, 20, 12, texCol)
+		end
+		chevCol.r, chevCol.g, chevCol.b = COL.red.r, COL.red.g, COL.red.b
+		chevCol.a = 110 + 120 * hf
+		draw.SimpleText("›", "SCPArmory_RoN_Name", w - 13, h / 2 - 1, chevCol,
+			TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	else
 		rowBG.a = 8 + 14 * hf
 		draw.RoundedBox(8, 0, 0, w, h, rowBG)
@@ -191,24 +248,7 @@ end
 local SAVE_DIR = "scp_armory"
 local SAVE_FILE = SAVE_DIR .. "/loadout.txt"
 
--- Fonds d'ambiance : depuis materials/ (addon sur le disque) ou, en mode
--- chargeur cloud, depuis data/scp_armory/ où le loader les télécharge.
--- Résolution paresseuse et re-tentée : l'image peut arriver après ce fichier.
-local bgMats = {}
-local bgRetry = 0
-local function BackdropMat(name)
-	local m = bgMats[name]
-	if m and not m:IsError() then return m end
-	if RealTime() < bgRetry then return m end
-	bgRetry = RealTime() + 2
-
-	m = Material("scp_armory/" .. name, "smooth")
-	if m:IsError() and file.Exists("scp_armory/" .. name, "DATA") then
-		m = Material("data/scp_armory/" .. name, "smooth")
-	end
-	bgMats[name] = m
-	return m
-end
+-- (matériaux d'ambiance et de thème : voir BackdropMat plus haut)
 
 local WEAPON_KEYS = { "primary", "secondary" }
 
@@ -972,6 +1012,18 @@ local function OpenMenu()
 			surface.SetDrawColor(COL.red)
 			surface.DrawRect(-18, -16, w + 34, 2)
 			DisableClipping(dc)
+		elseif uiStyle == "legion" then
+			-- panneau hologramme généré + écusson au coin supérieur droit
+			local dc = DisableClipping(true)
+			texCol.r, texCol.g, texCol.b, texCol.a = 255, 255, 255, 255
+			Draw9(BackdropMat("holo_panel.png"), -20, -18, w + 38, s:GetTall() + 36, 512, 512, 48, 26, texCol)
+			local em = BackdropMat("holo_emblem.png")
+			if em and not em:IsError() then
+				surface.SetDrawColor(255, 255, 255, 235)
+				surface.SetMaterial(em)
+				surface.DrawTexturedRect(w - 14, -40, 46, 46)
+			end
+			DisableClipping(dc)
 		end
 
 		-- Balayage animé du titre à chaque changement d'écran
@@ -1071,6 +1123,9 @@ local function OpenMenu()
 			surface.DrawOutlinedRect(0, 0, w, h, 1)
 			surface.SetDrawColor(COL.red)
 			surface.DrawRect(0, 0, w, 2)
+		elseif uiStyle == "legion" then
+			texCol.r, texCol.g, texCol.b, texCol.a = 255, 255, 255, 255
+			Draw9(BackdropMat("holo_panel.png"), 0, 0, w, h, 512, 512, 48, 20, texCol)
 		else
 			surface.SetDrawColor(COL.panel)
 			surface.DrawRect(0, 0, w, h)
@@ -1231,7 +1286,21 @@ local function OpenMenu()
 		-- Respiration discrète au repos
 		local pulse = (1 - s.hf) * math.sin(RealTime() * 2.2) * 7
 
-		if uiStyle == "cyber" then
+		if uiStyle == "legion" then
+			-- Plaque holographique + écusson, façon référence légion
+			texCol.r, texCol.g, texCol.b, texCol.a = 255, 255, 255, 255
+			Draw9(BackdropMat("holo_plate_hi.png"), 0, 0, w, h, 256, 64, 20, 12, texCol)
+			if s.hf > 0.02 then
+				surface.SetDrawColor(255, 255, 255, 34 * s.hf)
+				surface.DrawRect(6, 6, w - 12, h - 12)
+			end
+			local em = BackdropMat("holo_emblem.png")
+			if em and not em:IsError() then
+				surface.SetDrawColor(255, 255, 255, 230)
+				surface.SetMaterial(em)
+				surface.DrawTexturedRect(12, h / 2 - 12, 24, 24)
+			end
+		elseif uiStyle == "cyber" then
 			-- Bouton en contour lumineux, façon référence cyber
 			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 42 + 70 * s.hf + pulse * 2)
 			surface.DrawRect(0, 0, w, h)
@@ -1336,14 +1405,19 @@ local function OpenMenu()
 	backBtn.Paint = function(s, w, h)
 		s.hf = Lerp(FrameTime() * 10, s.hf or 0, s:IsHovered() and 1 or 0)
 
-		backBG.a = 18 + 34 * s.hf
-		draw.RoundedBox(UIRadius(8), 0, 0, w, h, backBG)
-		if uiStyle ~= "cartes" then
-			surface.SetDrawColor(
-				Lerp(s.hf, COL.line.r, COL.text.r),
-				Lerp(s.hf, COL.line.g, COL.text.g),
-				Lerp(s.hf, COL.line.b, COL.text.b), 255)
-			surface.DrawOutlinedRect(0, 0, w, h, 1)
+		if uiStyle == "legion" then
+			texCol.r, texCol.g, texCol.b, texCol.a = 255, 255, 255, 200 + 55 * s.hf
+			Draw9(BackdropMat("holo_plate.png"), 0, 0, w, h, 256, 64, 20, 12, texCol)
+		else
+			backBG.a = 18 + 34 * s.hf
+			draw.RoundedBox(UIRadius(8), 0, 0, w, h, backBG)
+			if uiStyle ~= "cartes" then
+				surface.SetDrawColor(
+					Lerp(s.hf, COL.line.r, COL.text.r),
+					Lerp(s.hf, COL.line.g, COL.text.g),
+					Lerp(s.hf, COL.line.b, COL.text.b), 255)
+				surface.DrawOutlinedRect(0, 0, w, h, 1)
+			end
 		end
 		draw.SimpleText(T("RETOUR"), "SCPArmory_RoN_Btn", w / 2 - 12, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		draw.SimpleText("ESC", "SCPArmory_RoN_Small", w - 10, h / 2, COL.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
@@ -1359,7 +1433,7 @@ local function OpenMenu()
 		pnl:DockMargin(0, 10, 10, 4)
 		pnl:SetTall(20)
 		pnl.Paint = function(_, w, h)
-			if uiStyle == "holo" or uiStyle == "cyber" then
+			if uiStyle == "holo" or uiStyle == "cyber" or uiStyle == "legion" then
 				-- barre verticale + libellé à la couleur d'accent (références)
 				surface.SetDrawColor(COL.red)
 				surface.DrawRect(0, 3, 3, 12)

@@ -44,10 +44,13 @@ restrictions par job et **chargement automatique des packs d'armes installés**.
 - **Interface en 3 langues** : français (défaut), **allemand** et **polonais**. La langue se choisit
   dans le panneau de configuration (section GÉNÉRAL) et s'applique en direct à tous les joueurs :
   menu, notifications, menu d'apparence et étiquette 3D2D de l'armoire.
-- **3 styles d'interface au choix dans la config** : **CARTES** (panneaux translucides
+- **7 styles d'interface au choix dans la config** : **CARTES** (panneaux translucides
   arrondis, dégradé d'accent — défaut), **READY OR NOT** (plat et épuré, fidèle au jeu),
-  **MODERN WARFARE** (anguleux, lignes surlignées à la couleur d'accent). Appliqué à tous
-  les joueurs en direct.
+  **MODERN WARFARE** (anguleux, surlignage d'accent), **HOLOGRAMME** (boîtes bordées,
+  chevrons, coins lumineux), **CYBER SCP** (bordures vives sur fond nuit), **SOMBRE
+  TACTIQUE** (minimal) et **LÉGION HOLO** (panneaux, plaques et écusson dessinés par des
+  images générées livrées dans `materials/scp_armory/holo_*`, rendues en 9 tranches).
+  Appliqué à tous les joueurs en direct.
 - **Couleur d'accent configurable partout** (menu, apparence, panneau de config) :
   curseurs RVB + 8 couleurs prédéfinies avec aperçu en direct dans la config en jeu.
 - **Mise à jour automatique au démarrage** (dossier [`maj-auto/`](maj-auto/LISEZMOI.md)) :
