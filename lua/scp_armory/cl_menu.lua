@@ -109,6 +109,8 @@ end
 -- coins fidèles, bords et centre étirés. b = bord en pixels texture,
 -- sb = bord affiché en pixels écran.
 local texCol = Color(255, 255, 255, 255)
+local shadowA = Color(0, 0, 0, 95)
+local shadowB = Color(0, 0, 0, 45)
 
 local function Draw9(mat, x, y, w, h, tw, th, b, sb, col)
 	if not mat or mat:IsError() then return end
@@ -452,6 +454,10 @@ local function OpenMenu()
 		return uiStyle == "legion" and "section" or "overview"
 	end
 
+	-- Contenu de l'hologramme APERÇU LOADOUT (rempli plus bas, thème légion) :
+	-- déclaré ici pour être capturé par le rendu 3D de l'aperçu
+	local DrawRecapContent = function() end
+
 	local function CurWeaponItem()
 		return SCPArmory.GetItem(curWeaponKey, selection[curWeaponKey])
 	end
@@ -476,30 +482,46 @@ local function OpenMenu()
 	local bgWeapon = false -- écran arme (établi) ou opérateur (râteliers)
 	local bgBlend = 0
 
+	-- Parallaxe lissé : le fond glisse à l'opposé de la souris, la caméra de
+	-- l'opérateur dans le même sens — le menu prend une vraie profondeur
+	local parX, parY = 0, 0
+
 	local function DrawBackdrop(mat, w, h, alpha)
 		if not mat or mat:IsError() then return end
 		local iw, ih = 1920, 1080
 		local scale = math.max(w / iw, h / ih)
 		local dw, dh = iw * scale, ih * scale
-		local u = (dw - w) / dw * 0.5
-		local v = (dh - h) / dh * 0.5
+		-- L'image est très légèrement zoomée pour offrir la marge de parallaxe
+		local inset = 0.015
+		local u = (dw - w) / dw * 0.5 + inset
+		local v = (dh - h) / dh * 0.5 + inset
 		surface.SetDrawColor(255, 255, 255, alpha)
 		surface.SetMaterial(mat)
-		surface.DrawTexturedRectUV(0, 0, w, h, u, v, 1 - u, 1 - v)
+		surface.DrawTexturedRectUV(0, 0, w, h, u + parX, v + parY, 1 - u + parX, 1 - v + parY)
 	end
 
 	frame.Paint = function(_, w, h)
 		surface.SetDrawColor(COL.bg)
 		surface.DrawRect(0, 0, w, h)
 
-		-- Fondu croisé râteliers <-> établi selon l'écran affiché
+		-- Parallaxe lissé suivant la souris (le fond glisse à l'opposé)
+		local tx = (gui.MouseX() / math.max(ScrW(), 1) - 0.5) * 0.02
+		local ty = (gui.MouseY() / math.max(ScrH(), 1) - 0.5) * 0.012
+		local fr = math.Clamp(FrameTime() * 5, 0, 1)
+		parX = parX + (tx - parX) * fr
+		parY = parY + (ty - parY) * fr
+
+		-- Fondu croisé selon l'écran affiché ; le thème légion vit dans son
+		-- hangar holographique généré (bg_holo)
 		if SCPArmory.Config.MenuScene ~= false then
 			bgBlend = Lerp(FrameTime() * 6, bgBlend, bgWeapon and 1 or 0)
+			local backA = uiStyle == "legion" and "bg_holo.png" or "bg_racks.png"
+			local backB = uiStyle == "legion" and "bg_holo.png" or "bg_table.png"
 			if bgBlend < 0.99 then
-				DrawBackdrop(BackdropMat("bg_racks.png"), w, h, 255 * (1 - bgBlend))
+				DrawBackdrop(BackdropMat(backA), w, h, 255 * (1 - bgBlend))
 			end
 			if bgBlend > 0.01 then
-				DrawBackdrop(BackdropMat("bg_table.png"), w, h, 255 * bgBlend)
+				DrawBackdrop(BackdropMat(backB), w, h, 255 * bgBlend)
 			end
 		end
 
@@ -705,6 +727,16 @@ local function OpenMenu()
 				s:SetLookAt(s.camAim)
 			end
 		end
+
+		-- Profondeur : la caméra de l'opérateur suit légèrement la souris,
+		-- la scène 3D (opérateur, socle, hologrammes) prend du relief
+		if not s.CurIsWeapon then
+			local dist = SCPArmory.Config.PreviewDistance or 120
+			local amp = (uiStyle == "legion") and 1.6 or 1
+			local target = Vector(dist, parX * 420 * amp, 55 - parY * 260 * amp)
+			s.plyCam = LerpVector(math.Clamp(FrameTime() * 4, 0, 1), s.plyCam or target, target)
+			s:SetCamPos(s.plyCam)
+		end
 	end
 
 	preview.LayoutEntity = function(pnl, ent)
@@ -733,11 +765,57 @@ local function OpenMenu()
 	frame.OnRemove = function()
 		ClearHeldWeapon()
 		ClearPreviewAtts()
+		for _, hw in ipairs(preview.HoloWeps or {}) do
+			if IsValid(hw.mdl) then hw.mdl:Remove() end
+		end
 	end
 
 	preview.PostDrawModel = function(s, ent)
 		if IsValid(s.HeldWep) then
 			s.HeldWep:DrawModel()
+		end
+
+		-- Scène 3D du thème légion : socle holographique sous l'opérateur,
+		-- hologramme APERÇU incliné dans la pièce et armes flottantes
+		if uiStyle == "legion" and not s.CurIsWeapon then
+			local rt = RealTime()
+			local r, g, b = COL.red.r, COL.red.g, COL.red.b
+			local pulse = 150 + math.sin(rt * 1.6) * 50
+
+			-- Socle : anneaux, graduations et écusson au sol, en rotation
+			cam.Start3D2D(Vector(0, 0, 2), Angle(0, (rt * 9) % 360, 0), 0.5)
+				surface.DrawCircle(0, 0, 70, r, g, b, pulse)
+				surface.DrawCircle(0, 0, 56, r, g, b, pulse * 0.5)
+				surface.DrawCircle(0, 0, 38, r, g, b, pulse * 0.35)
+				surface.SetDrawColor(r, g, b, pulse * 0.8)
+				for i = 0, 11 do
+					local an = math.rad(i * 30)
+					surface.DrawRect(math.cos(an) * 62 - 3, math.sin(an) * 62 - 1.5, 6, 3)
+				end
+				local em = BackdropMat("holo_emblem.png")
+				if em and not em:IsError() then
+					surface.SetDrawColor(r, g, b, pulse * 0.35)
+					surface.SetMaterial(em)
+					surface.DrawTexturedRectRotated(0, 0, 60, 60, -rt * 18)
+				end
+			cam.End3D2D()
+
+			-- Hologramme APERÇU LOADOUT : plan réellement incliné (hub)
+			if mode == "overview" then
+				cam.Start3D2D(Vector(-4, 34, 92), Angle(0, 78, 90), 0.085)
+					DrawRecapContent(340, 470)
+				cam.End3D2D()
+
+				-- Armes sélectionnées flottant en 3D devant l'hologramme
+				for _, hw in ipairs(s.HoloWeps or {}) do
+					if IsValid(hw.mdl) then
+						hw.mdl:SetAngles(Angle(0, (rt * 36 + hw.phase) % 360, 0))
+						hw.mdl:SetPos(hw.pos + Vector(0, 0, math.sin(rt * 0.9 + hw.phase) * 0.8))
+						hw.mdl:SetupBones()
+						hw.mdl:DrawModel()
+					end
+				end
+			end
 		end
 
 		if not s.AttModels then return end
@@ -996,6 +1074,14 @@ local function OpenMenu()
 	local redAnim = Color(COL.red.r, COL.red.g, COL.red.b, 255)
 
 	column.Paint = function(s, w)
+		-- Ombres portées décalées : le panneau flotte au-dessus de la scène
+		if uiStyle ~= "ron" then
+			local dc = DisableClipping(true)
+			draw.RoundedBox(18, -4, 2, w + 40, s:GetTall() + 38, shadowB)
+			draw.RoundedBox(14, -12, -8, w + 34, s:GetTall() + 30, shadowA)
+			DisableClipping(dc)
+		end
+
 		-- Fond de colonne selon le style : carte translucide arrondie
 		-- (cartes), panneau anguleux à liseré d'accent (mw), rien (ron —
 		-- le dégradé sombre du fond suffit, comme dans le jeu d'origine)
@@ -1210,21 +1296,15 @@ local function OpenMenu()
 		end
 	end
 
-	-- ---------------------- panneau APERÇU LOADOUT du thème légion (droite)
+	-- --------------- hologramme APERÇU LOADOUT du thème légion (scène 3D)
+	-- Le panneau n'est plus un élément d'écran : c'est un plan holographique
+	-- réellement incliné dans la pièce (voir preview.PostDrawModel), et les
+	-- armes sélectionnées flottent devant lui en modèles 3D rotatifs.
 
-	local recap = nil
-	local recapModels = {}
 	local RebuildRecap = function() end
 
 	if uiStyle == "legion" then
-		local rw = math.Clamp(math.floor(ScrW() * 0.20), 300, 360)
-		local rh = 470
-		recap = vgui.Create("DPanel", frame)
-		recap:SetSize(rw, rh)
-		recap:SetPos(ScrW() - rw - 42, 108)
-		recap:SetMouseInputEnabled(false)
-
-		recap.Paint = function(s, w, h)
+		DrawRecapContent = function(w, h)
 			texCol.r, texCol.g, texCol.b, texCol.a = 255, 255, 255, 255
 			Draw9(BackdropMat("holo_panel.png"), 0, 0, w, h, 512, 512, 48, 22, texCol)
 			DrawSpacedText(T("APERÇU LOADOUT"), "SCPArmory_RoN_Label", 24, 20, COL.red, 2)
@@ -1237,7 +1317,7 @@ local function OpenMenu()
 				draw.SimpleText(T(SlotByKey(wk).label), "SCPArmory_RoN_Small", 24, y, COL.dim)
 				draw.SimpleText(SCPArmory.FrUpper(item and item.name or "—"), "SCPArmory_RoN_NameSm",
 					24, y + 14, COL.text)
-				y = y + 100 -- la silhouette 3D occupe l'espace en dessous
+				y = y + 96 -- l'arme flotte en 3D devant cet espace
 			end
 
 			DrawSpacedText(T("ÉQUIPEMENT"), "SCPArmory_RoN_Small", 24, y, COL.dim, 1)
@@ -1259,12 +1339,12 @@ local function OpenMenu()
 				y = y + 16
 			end
 
-			-- Poids total (recalcul limité, comme le bloc du bas)
-			local stats = s.statsCache
-			if not stats or (s.statsNext or 0) < RealTime() then
-				s.statsCache = SCPArmory.ComputeStats(selection)
-				s.statsNext = RealTime() + 0.25
-				stats = s.statsCache
+			-- Poids total (recalcul limité)
+			local stats = preview.recapStats
+			if not stats or (preview.recapStatsNext or 0) < RealTime() then
+				preview.recapStats = SCPArmory.ComputeStats(selection)
+				preview.recapStatsNext = RealTime() + 0.25
+				stats = preview.recapStats
 			end
 			local by = h - 46
 			draw.SimpleText(T("POIDS LOADOUT"), "SCPArmory_RoN_Small", 24, by, COL.dim)
@@ -1276,37 +1356,28 @@ local function OpenMenu()
 			surface.DrawRect(24, by + 18, math.Clamp(stats.weight / 30, 0, 1) * (w - 48), 3)
 		end
 
-		-- Recrée les silhouettes des armes quand la sélection change
+		-- Recrée les armes flottantes quand la sélection change
 		RebuildRecap = function()
-			for _, p in ipairs(recapModels) do
-				if IsValid(p) then p:Remove() end
+			for _, hw in ipairs(preview.HoloWeps or {}) do
+				if IsValid(hw.mdl) then hw.mdl:Remove() end
 			end
-			recapModels = {}
-			if not recap:IsVisible() then return end
+			preview.HoloWeps = {}
+			preview.recapStatsNext = 0
 
-			local rw2 = recap:GetWide()
-			local y = 48
-			for _, wk in ipairs(WEAPON_KEYS) do
-				local item = SCPArmory.GetItem(wk, selection[wk])
-				if item and item.icon then
-					local pnl = vgui.Create("DPanel", recap)
-					pnl:SetPos(24, y + 32)
-					pnl:SetSize(rw2 - 48, 56)
-					pnl:SetMouseInputEnabled(false)
-					pnl.Paint = function(_, w2, h2)
-						SCPArmory.DrawWebIcon(item.icon, 0, 0, w2, h2)
+			local defs = {
+				{ key = "primary", pos = Vector(10, 46, 79), phase = 0 },
+				{ key = "secondary", pos = Vector(10, 46, 58), phase = 120 },
+			}
+			for _, d in ipairs(defs) do
+				local item = SCPArmory.GetItem(d.key, selection[d.key])
+				if HasModel(item) then
+					local mdl = ClientsideModel(item.model, RENDERGROUP_OPAQUE)
+					if IsValid(mdl) then
+						mdl:SetNoDraw(true)
+						mdl:SetModelScale(0.5, 0)
+						table.insert(preview.HoloWeps, { mdl = mdl, pos = d.pos, phase = d.phase })
 					end
-					table.insert(recapModels, pnl)
-				elseif HasModel(item) then
-					local mp = vgui.Create("DModelPanel", recap)
-					mp:SetPos(24, y + 32)
-					mp:SetSize(rw2 - 48, 56)
-					mp:SetModel(item.model)
-					mp:SetMouseInputEnabled(false)
-					FitModelSide(mp)
-					table.insert(recapModels, mp)
 				end
-				y = y + 100
 			end
 		end
 	end
@@ -1548,6 +1619,10 @@ local function OpenMenu()
 			gui.HideGameUI()
 			GoBack()
 		end
+
+		-- La colonne flotte en couche intermédiaire (parallaxe positionnel :
+		-- la souris suit la vraie position, les clics restent exacts)
+		column:SetPos(colX - math.Round(parX * 520), colY - math.Round(parY * 380))
 	end
 
 	local backBtn = vgui.Create("DButton", bottom)
@@ -2179,9 +2254,8 @@ local function OpenMenu()
 			infoDesc:SetText(item and item.desc or "")
 		end
 
-		-- Panneau APERÇU LOADOUT (hub légion) : visible sur le hub uniquement
-		if recap then
-			recap:SetVisible(mode == "overview")
+		-- Hologramme APERÇU (légion) : armes flottantes recalées sur la sélection
+		if uiStyle == "legion" and mode == "overview" then
 			RebuildRecap()
 		end
 
