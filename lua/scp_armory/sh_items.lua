@@ -126,6 +126,22 @@ SCPArmory.Items = {
 	},
 }
 
+-- Marque les objets des pools principale/secondaire comme ARMES : par défaut
+-- une arme n'est donnée à PERSONNE (SCPArmory.IsItemAvailable) tant que ses
+-- métiers ne sont pas assignés dans la config en jeu. L'entrée « — Sans — »
+-- reste disponible pour tous. Rappelé après chaque chargement automatique.
+function SCPArmory.TagWeaponItems()
+	for _, pool in ipairs({ "primary", "secondary" }) do
+		for _, item in ipairs(SCPArmory.Items[pool] or {}) do
+			if item.id ~= "none" then
+				item.isWeapon = true
+			end
+		end
+	end
+end
+
+SCPArmory.TagWeaponItems()
+
 -- Emplacements du loadout, dans l'ordre (l'ordre sert aussi au protocole réseau)
 SCPArmory.Slots = {
 	{ key = "primary",   pool = "primary",   label = "ARME PRINCIPALE" },

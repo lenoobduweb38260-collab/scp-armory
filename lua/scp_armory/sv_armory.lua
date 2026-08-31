@@ -365,8 +365,11 @@ local EDITABLE = {
 	LockerModel        = "string",
 	Language           = "string",
 	UITheme            = "string",
-	MenuBGURL          = "string",
-	MenuBGWeaponURL    = "string",
+	MenuBGRonURL       = "string",
+	MenuBGRonWeaponURL = "string",
+	MenuBGMwURL        = "string",
+	MenuBGMwWeaponURL  = "string",
+	ForceLoadPrefixes  = "string",
 	UIColorR           = "number",
 	UIColorG           = "number",
 	UIColorB           = "number",
@@ -440,12 +443,18 @@ local function ApplyOverrides(data)
 	end
 
 	-- Les fonds personnalisés doivent être des URL http(s) directes
-	for _, k in ipairs({ "MenuBGURL", "MenuBGWeaponURL" }) do
+	for _, k in ipairs({ "MenuBGRonURL", "MenuBGRonWeaponURL", "MenuBGMwURL", "MenuBGMwWeaponURL" }) do
 		local v = SCPArmory.Config[k]
 		if not isstring(v) or (v ~= "" and not string.find(v, "^https?://")) then
 			SCPArmory.Config[k] = ""
 		end
 	end
+
+	-- Préfixes de packs forcés (MRS…) : minuscules, lettres/chiffres/_ et
+	-- virgules uniquement — tout le reste est retiré
+	local pre = SCPArmory.Config.ForceLoadPrefixes
+	SCPArmory.Config.ForceLoadPrefixes = isstring(pre)
+		and string.gsub(string.lower(pre), "[^%w_,]", "") or "mrs_"
 
 	-- Icônes : stockées même si l'objet n'existe pas encore
 	-- (armes auto-chargées après le chargement de la config).
@@ -556,6 +565,9 @@ net.Receive("SCPArmory_SaveConfig", function(_, ply)
 	for k in pairs(EDITABLE) do before[k] = SCPArmory.Config[k] end
 
 	ApplyOverrides(data)
+	-- Re-passe du chargement automatique (sans doublons) : de nouveaux
+	-- préfixes de packs (MRS…) prennent effet sans redémarrage
+	SCPArmory.AutoLoadWeapons()
 	SaveConfigToDisk()
 	SendConfig()
 	Notify(ply, SCPArmory.T("Configuration enregistrée et diffusée à tous les joueurs."))

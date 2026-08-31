@@ -32,6 +32,25 @@ local function PoolHasClass(pool, class)
 	return false
 end
 
+-- Préfixes de classes à charger même si le pack ne marque pas ses armes
+-- comme spawnables (config ForceLoadPrefixes — addon MRS par défaut)
+local function ForcedPrefixes()
+	local out = {}
+	for pre in string.gmatch(string.lower(tostring(SCPArmory.Config.ForceLoadPrefixes or "")), "[^,%s]+") do
+		if #pre >= 2 and #pre <= 32 then
+			table.insert(out, pre)
+		end
+	end
+	return out
+end
+
+local function MatchesPrefix(class, prefixes)
+	for _, pre in ipairs(prefixes) do
+		if string.sub(class, 1, #pre) == pre then return true end
+	end
+	return false
+end
+
 function SCPArmory.AutoLoadWeapons()
 	if not SCPArmory.Config.AutoLoadWeapons then
 		SCPArmory.ApplyPendingItemConfig()
@@ -43,14 +62,16 @@ function SCPArmory.AutoLoadWeapons()
 		blacklist[class] = true
 	end
 
+	local prefixes = ForcedPrefixes()
 	local added = { primary = {}, secondary = {} }
 
 	for _, swep in ipairs(weapons.GetList()) do
 		local class = swep.ClassName
+		local forced = isstring(class) and MatchesPrefix(string.lower(class), prefixes)
 
 		if isstring(class) and not blacklist[class]
-			and swep.Spawnable and not swep.AdminOnly
-			and isstring(swep.PrintName) and swep.PrintName ~= "" then
+			and (forced or (swep.Spawnable and not swep.AdminOnly
+				and isstring(swep.PrintName) and swep.PrintName ~= "")) then
 
 			-- Emplacement HL2 : 1 = armes de poing, 2/3 = PM, fusils, snipers
 			local slot = tonumber(swep.Slot)
@@ -59,6 +80,11 @@ function SCPArmory.AutoLoadWeapons()
 				pool = "secondary"
 			elseif slot == 2 or slot == 3 then
 				pool = "primary"
+			elseif forced then
+				-- Pack sans emplacement HL2 exploitable (MRS…) : on range
+				-- selon la prise en main (pistolet = secondaire)
+				local ht = string.lower(tostring(swep.HoldType or ""))
+				pool = (ht == "pistol" or ht == "revolver") and "secondary" or "primary"
 			end
 
 			if pool and not PoolHasClass(pool, class) and not SCPArmory.GetItem(pool, class) then
@@ -67,9 +93,12 @@ function SCPArmory.AutoLoadWeapons()
 					ammoType = nil
 				end
 
+				local name = swep.PrintName
+				if not isstring(name) or name == "" then name = class end
+
 				table.insert(added[pool], {
 					id = class,
-					name = tostring(swep.PrintName),
+					name = tostring(name),
 					desc = tostring(swep.Purpose or ""),
 					weight = (pool == "primary") and 3.0 or 1.0,
 					class = class,
@@ -90,6 +119,8 @@ function SCPArmory.AutoLoadWeapons()
 		end
 	end
 
+	-- Les armes ajoutées héritent du défaut « donnée à personne »
+	SCPArmory.TagWeaponItems()
 	SCPArmory.ApplyPendingItemConfig()
 end
 

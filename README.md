@@ -46,13 +46,25 @@ restrictions par job et **chargement automatique des packs d'armes installés**.
   menu, notifications, menu d'apparence et étiquette 3D2D de l'armoire.
 - **2 styles d'interface au choix dans la config** : **READY OR NOT** (plat et épuré,
   fidèle au jeu — défaut) et **MODERN WARFARE** (la vue d'ensemble devient un écran de
-  sélection façon **killstreaks** : grandes cartes anguleuses en bas de l'écran, une par
-  emplacement + APPARENCE, opérateur au centre, barre DÉPLOYER en bas à droite ; les
-  sous-écrans gardent la colonne classique). Appliqué à tous les joueurs en direct.
-- **Fond du menu personnalisable** : collez l'URL directe (https) de **votre image**
-  dans la config (section INTERFACE) — un champ pour l'écran opérateur, un pour l'écran
-  de modification d'arme. L'image est affichée telle quelle (recadrée plein écran, avec
-  la parallaxe). Champ vide = fonds livrés avec l'addon (`bg_racks` / `bg_table`).
+  sélection façon **killstreaks** : grandes cartes **arrondies** à liseré d'accent en
+  bas de l'écran, une par emplacement + APPARENCE, opérateur au centre, barre DÉPLOYER
+  en bas à droite ; les sous-écrans gardent la colonne classique, en cellules
+  arrondies). Appliqué à tous les joueurs en direct.
+- **Fonds du menu personnalisables — un par lieu et par style** : collez l'URL directe
+  (https) de **votre image** dans la config (section INTERFACE). Quatre champs :
+  écran opérateur et écran de modification d'arme, pour Ready or Not **et** pour
+  Modern Warfare. L'image est affichée telle quelle (recadrée plein écran, avec la
+  parallaxe). Champ vide = fonds livrés avec l'addon (`bg_racks` / `bg_table`).
+- **Armes données à PERSONNE par défaut** : une arme (pools principale/secondaire,
+  packs auto-chargés compris) n'apparaît pour **aucun joueur** tant que ses métiers ne
+  sont pas assignés dans la config (section OBJETS) — cochez ses métiers, ou **TOUS
+  LES MÉTIERS** pour la rendre disponible à tout le monde. Les emplacements « Sans
+  arme » et les autres objets (tactique, gilets, casques) restent visibles par tous.
+- **Packs d'armes non détectés (addon MRS…)** : champ « Préfixes de classes à
+  charger » dans la config (section GÉNÉRAL, défaut `mrs_`) — les armes dont la classe
+  commence par un de ces préfixes sont chargées dans les pools même si le pack ne les
+  marque pas comme spawnables, rangées selon leur prise en main (pistolet =
+  secondaire). Pris en compte immédiatement à l'enregistrement de la config.
 - **Couleur d'accent configurable partout** (menu, apparence, panneau de config) :
   curseurs RVB + 8 couleurs prédéfinies avec aperçu en direct dans la config en jeu.
 - **Mise à jour automatique au démarrage** (dossier [`maj-auto/`](maj-auto/LISEZMOI.md)) :
@@ -100,6 +112,9 @@ configuration en jeu) :
 | --- | --- |
 | `AutoLoadWeapons` | Charge automatiquement les armes des packs installés (redémarrage requis) |
 | `AutoLoadBlacklist` | Classes d'armes à exclure du chargement automatique |
+| `ForceLoadPrefixes` | Préfixes de classes chargés même sans être spawnables (addon MRS… — défaut `mrs_`) |
+| `MenuBGRonURL` / `MenuBGRonWeaponURL` | Fonds personnalisés (URL https) du style Ready or Not — opérateur / arme |
+| `MenuBGMwURL` / `MenuBGMwWeaponURL` | Fonds personnalisés (URL https) du style Modern Warfare — cartes / arme |
 | `RequireEntity` | Si `true`, menu et déploiement uniquement près d'une armoire `scp_armory_locker` |
 | `UseDistance` | Portée (en unités) autour de l'armoire quand `RequireEntity = true` |
 | `LockerModel` | Modèle 3D de l'armoire d'armurerie |

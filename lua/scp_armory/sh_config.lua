@@ -58,11 +58,13 @@ SCPArmory.Config = {
 	-- "mw"  = Modern Warfare : sélection en grandes cartes façon killstreaks
 	UITheme = "ron",
 
-	-- Fond personnalisé du menu : URL directe (https) de VOTRE image,
-	-- affichée telle quelle derrière l'opérateur (vide = fond livré).
-	-- Deuxième URL pour l'écran de modification d'arme (vide = fond livré).
-	MenuBGURL = "",
-	MenuBGWeaponURL = "",
+	-- Fonds personnalisés du menu : URL directe (https) de VOTRE image,
+	-- affichée telle quelle. Un fond par lieu (écran opérateur / écran de
+	-- modification d'arme) et par style d'interface (vide = fond livré).
+	MenuBGRonURL       = "", -- Ready or Not — écran opérateur (loadout)
+	MenuBGRonWeaponURL = "", -- Ready or Not — écran modification d'arme
+	MenuBGMwURL        = "", -- Modern Warfare — écran des cartes
+	MenuBGMwWeaponURL  = "", -- Modern Warfare — écran modification d'arme
 
 	-- Couleur d'accent de l'interface, appliquée partout dans les menus
 	-- (rouge Fondation par défaut ; réglable dans la config en jeu)
@@ -91,6 +93,11 @@ SCPArmory.Config = {
 
 	-- Classes d'armes à ignorer lors du chargement automatique
 	AutoLoadBlacklist = {},
+
+	-- Packs d'armes supplémentaires (MRS…) : préfixes de classes, séparés
+	-- par des virgules, chargés dans les pools même si le pack ne marque pas
+	-- ses armes comme spawnables (pris en compte au prochain redémarrage)
+	ForceLoadPrefixes = "mrs_",
 }
 
 -- Majuscules compatibles avec les accents français (string.upper les ignore)
@@ -142,13 +149,21 @@ SCPArmory.AllowedBodygroups = SCPArmory.AllowedBodygroups or {}
 
 -- Un objet réservé à certains jobs (champ item.jobs) est totalement invisible
 -- pour les autres, comme dans Ready or Not : on ne voit que son arsenal.
+--
+-- Cas particuliers :
+--   - une ARME (pools principale/secondaire, champ isWeapon) sans métier
+--     assigné n'est donnée à PERSONNE — c'est le défaut : assignez les
+--     métiers (ou TOUS) dans la config en jeu pour la rendre disponible ;
+--   - l'entrée "*" dans item.jobs = tous les métiers.
 function SCPArmory.IsItemAvailable(ply, item)
-	if not item.jobs then return true end
+	if not item.jobs then
+		return not item.isWeapon
+	end
 	if not IsValid(ply) then return false end
 
 	local jobName = team.GetName(ply:Team())
 	for _, job in ipairs(item.jobs) do
-		if job == jobName then return true end
+		if job == "*" or job == jobName then return true end
 	end
 	return false
 end

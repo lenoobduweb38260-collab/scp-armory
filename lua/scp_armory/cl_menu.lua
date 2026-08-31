@@ -44,6 +44,11 @@ local rowBG = Color(255, 255, 255, 8)
 local btnBG = Color(190, 34, 28, 255)
 local flashBG = Color(255, 255, 255, 255)
 local backBG = Color(255, 255, 255, 20)
+local mwCell = Color(255, 255, 255, 5)
+local mwFill = Color(190, 34, 28, 0)
+local mwEdge = Color(190, 34, 28, 90)
+local mwDark = Color(12, 12, 15, 235)
+local mwGloss = Color(255, 255, 255, 0)
 
 -- Matériaux (fonds et habillage du thème légion) : depuis materials/ (addon
 -- sur le disque) ou, en mode chargeur cloud, depuis data/scp_armory/ où le
@@ -138,19 +143,16 @@ local function DrawSlotIcon(kind, x, y, s, col)
 end
 
 -- Habillage commun des lignes de la colonne : ligne plate à séparateur
--- (ron), cellule sombre à surlignage d'accent (mw)
+-- (ron), cellule sombre arrondie à surlignage d'accent (mw)
 local function RowChrome(hf, w, h)
 	if uiStyle == "mw" then
-		surface.SetDrawColor(255, 255, 255, 4)
-		surface.DrawRect(0, 0, w, h)
+		draw.RoundedBox(8, 0, 0, w, h, mwCell)
 		if hf > 0.01 then
-			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 36 * hf)
-			surface.DrawRect(0, 0, w, h)
-			surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 255 * hf)
-			surface.DrawRect(0, 0, 3, h)
+			mwFill.r, mwFill.g, mwFill.b, mwFill.a = COL.red.r, COL.red.g, COL.red.b, 36 * hf
+			draw.RoundedBox(8, 0, 0, w, h, mwFill)
+			mwFill.a = 255 * hf
+			draw.RoundedBox(2, 0, 5, 3, h - 10, mwFill)
 		end
-		surface.SetDrawColor(COL.lineF)
-		surface.DrawRect(0, h - 1, w, 1)
 	else
 		if hf > 0.01 then
 			surface.SetDrawColor(255, 255, 255, 6 * hf)
@@ -310,7 +312,7 @@ local function OpenMenu()
 	ApplyTheme()
 
 	-- Espacement des lignes selon le style
-	local rowGap = (uiStyle == "mw") and 2 or 0
+	local rowGap = (uiStyle == "mw") and 4 or 0
 
 	local selection, autoApply, attSel = LoadSaved()
 	local plyModel = LocalPlayer():GetModel()
@@ -405,15 +407,16 @@ local function OpenMenu()
 		parY = parY + (ty - parY) * fr
 
 		-- Fondu croisé selon l'écran affiché (opérateur / établi d'arme) ;
-		-- chaque écran peut être remplacé par VOTRE image via la config
+		-- chaque lieu ET chaque style d'interface a son URL de fond configurable
 		if SCPArmory.Config.MenuScene ~= false then
 			bgBlend = Lerp(FrameTime() * 6, bgBlend, bgWeapon and 1 or 0)
+			local mw = (uiStyle == "mw")
 			if bgBlend < 0.99 then
-				local m, iw, ih = ResolveBackdrop("bg_racks.png", "MenuBGURL")
+				local m, iw, ih = ResolveBackdrop("bg_racks.png", mw and "MenuBGMwURL" or "MenuBGRonURL")
 				DrawBackdrop(m, iw, ih, w, h, 255 * (1 - bgBlend))
 			end
 			if bgBlend > 0.01 then
-				local m, iw, ih = ResolveBackdrop("bg_table.png", "MenuBGWeaponURL")
+				local m, iw, ih = ResolveBackdrop("bg_table.png", mw and "MenuBGMwWeaponURL" or "MenuBGRonWeaponURL")
 				DrawBackdrop(m, iw, ih, w, h, 255 * bgBlend)
 			end
 		end
@@ -1168,13 +1171,20 @@ local function OpenMenu()
 		btnBG.r = math.Clamp(Lerp(s.hf, COL.red.r, COL.redHi.r) + pulse, 0, 255)
 		btnBG.g = math.Clamp(Lerp(s.hf, COL.red.g, COL.redHi.g) + pulse * 0.3, 0, 255)
 		btnBG.b = math.Clamp(Lerp(s.hf, COL.red.b, COL.redHi.b) + pulse * 0.3, 0, 255)
-		surface.SetDrawColor(btnBG)
-		surface.DrawRect(0, 0, w, h)
+
+		-- Angles arrondis en thème MW, coupe droite RoN
+		local br = (uiStyle == "mw") and 8 or 0
+		draw.RoundedBox(br, 0, 0, w, h, btnBG)
 
 		-- Liseré blanc qui s'allume au survol
 		if s.hf > 0.02 then
-			surface.SetDrawColor(255, 255, 255, 60 * s.hf)
-			surface.DrawOutlinedRect(3, 3, w - 6, h - 6, 1)
+			if br > 0 then
+				mwGloss.a = 26 * s.hf
+				draw.RoundedBox(br, 0, 0, w, h / 2, mwGloss)
+			else
+				surface.SetDrawColor(255, 255, 255, 60 * s.hf)
+				surface.DrawOutlinedRect(3, 3, w - 6, h - 6, 1)
+			end
 		end
 
 		draw.SimpleText(T("DÉPLOYER"), "SCPArmory_RoN_Btn", w / 2, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
@@ -1183,8 +1193,8 @@ local function OpenMenu()
 		if s.flashT then
 			local fa = 1 - (RealTime() - s.flashT) / 0.25
 			if fa > 0 then
-				surface.SetDrawColor(255, 255, 255, 170 * fa)
-				surface.DrawRect(0, 0, w, h)
+				flashBG.a = 170 * fa
+				draw.RoundedBox(br, 0, 0, w, h, flashBG)
 			end
 		end
 	end
@@ -1272,13 +1282,16 @@ local function OpenMenu()
 	backBtn.Paint = function(s, w, h)
 		s.hf = Lerp(FrameTime() * 10, s.hf or 0, s:IsHovered() and 1 or 0)
 
+		local br = (uiStyle == "mw") and 8 or 0
 		backBG.a = 18 + 34 * s.hf
-		draw.RoundedBox(0, 0, 0, w, h, backBG)
-		surface.SetDrawColor(
-			Lerp(s.hf, COL.line.r, COL.text.r),
-			Lerp(s.hf, COL.line.g, COL.text.g),
-			Lerp(s.hf, COL.line.b, COL.text.b), 255)
-		surface.DrawOutlinedRect(0, 0, w, h, 1)
+		draw.RoundedBox(br, 0, 0, w, h, backBG)
+		if br == 0 then
+			surface.SetDrawColor(
+				Lerp(s.hf, COL.line.r, COL.text.r),
+				Lerp(s.hf, COL.line.g, COL.text.g),
+				Lerp(s.hf, COL.line.b, COL.text.b), 255)
+			surface.DrawOutlinedRect(0, 0, w, h, 1)
+		end
 
 		draw.SimpleText(T("RETOUR"), "SCPArmory_RoN_Btn", w / 2 - 12, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		draw.SimpleText("ESC", "SCPArmory_RoN_Small", w - 10, h / 2, COL.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
@@ -1856,11 +1869,10 @@ local function OpenMenu()
 		mwChk:SetText("")
 		mwChk.Paint = function(s, _, h)
 			local hov = s:IsHovered()
-			surface.SetDrawColor(hov and COL.text or COL.line)
-			surface.DrawOutlinedRect(0, 3, 14, 14, 1)
+			draw.RoundedBox(4, 0, 3, 14, 14, hov and COL.text or COL.line)
+			draw.RoundedBox(3, 1, 4, 12, 12, mwDark)
 			if autoChk.checked then
-				surface.SetDrawColor(COL.red)
-				surface.DrawRect(3, 6, 8, 8)
+				draw.RoundedBox(2, 3, 6, 8, 8, COL.red)
 			end
 			draw.SimpleText(T("Réappliquer ce chargement au respawn"), "SCPArmory_RoN_Small", 22, h / 2,
 				hov and COL.soft or COL.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
@@ -1876,15 +1888,19 @@ local function OpenMenu()
 		mwBack:SetText("")
 		mwBack.Paint = function(s, w, h)
 			s.hf = Lerp(FrameTime() * 10, s.hf or 0, s:IsHovered() and 1 or 0)
-			backBG.a = 18 + 34 * s.hf
-			draw.RoundedBox(0, 0, 0, w, h, backBG)
-			surface.SetDrawColor(
-				Lerp(s.hf, COL.line.r, COL.text.r),
-				Lerp(s.hf, COL.line.g, COL.text.g),
-				Lerp(s.hf, COL.line.b, COL.text.b), 255)
-			surface.DrawOutlinedRect(0, 0, w, h, 1)
+
+			-- Bouton arrondi à liseré : boîte claire, puis fond sombre en creux
+			mwEdge.r = Lerp(s.hf, COL.line.r, COL.text.r)
+			mwEdge.g = Lerp(s.hf, COL.line.g, COL.text.g)
+			mwEdge.b = Lerp(s.hf, COL.line.b, COL.text.b)
+			mwEdge.a = 255
+			draw.RoundedBox(12, 0, 0, w, h, mwEdge)
+			draw.RoundedBox(11, 1, 1, w - 2, h - 2, mwDark)
+			backBG.a = 14 + 30 * s.hf
+			draw.RoundedBox(11, 1, 1, w - 2, h - 2, backBG)
+
 			draw.SimpleText(T("RETOUR"), "SCPArmory_RoN_Btn", w / 2 - 12, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-			draw.SimpleText("ESC", "SCPArmory_RoN_Small", w - 10, h / 2, COL.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+			draw.SimpleText("ESC", "SCPArmory_RoN_Small", w - 12, h / 2, COL.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 		end
 		mwBack.DoClick = GoBack
 
@@ -1899,11 +1915,12 @@ local function OpenMenu()
 			btnBG.r = math.Clamp(Lerp(s.hf, COL.red.r, COL.redHi.r) + pulse, 0, 255)
 			btnBG.g = math.Clamp(Lerp(s.hf, COL.red.g, COL.redHi.g) + pulse * 0.3, 0, 255)
 			btnBG.b = math.Clamp(Lerp(s.hf, COL.red.b, COL.redHi.b) + pulse * 0.3, 0, 255)
-			surface.SetDrawColor(btnBG)
-			surface.DrawRect(0, 0, w, h)
+			draw.RoundedBox(12, 0, 0, w, h, btnBG)
+
+			-- Reflet en tête qui s'allume au survol
 			if s.hf > 0.02 then
-				surface.SetDrawColor(255, 255, 255, 60 * s.hf)
-				surface.DrawOutlinedRect(3, 3, w - 6, h - 6, 1)
+				mwGloss.a = 30 * s.hf
+				draw.RoundedBox(12, 0, 0, w, h / 2, mwGloss)
 			end
 
 			draw.SimpleText(T("DÉPLOYER"), "SCPArmory_RoN_Btn", w / 2, h / 2 - 8, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
@@ -1912,8 +1929,8 @@ local function OpenMenu()
 			if s.flashT then
 				local fa = 1 - (RealTime() - s.flashT) / 0.25
 				if fa > 0 then
-					surface.SetDrawColor(255, 255, 255, 170 * fa)
-					surface.DrawRect(0, 0, w, h)
+					flashBG.a = 170 * fa
+					draw.RoundedBox(12, 0, 0, w, h, flashBG)
 				end
 			end
 		end
@@ -1967,21 +1984,20 @@ local function OpenMenu()
 				card.Paint = function(s, w, h)
 					s.hf = Lerp(FrameTime() * 10, s.hf or 0, s:IsHovered() and 1 or 0)
 
-					-- Carte anguleuse sombre, encoche d'accent en tête
-					surface.SetDrawColor(10, 10, 13, 235)
-					surface.DrawRect(0, 0, w, h)
+					-- Carte arrondie sombre à liseré d'accent (boîte claire
+					-- puis fond en creux : bordure arrondie sans allocation)
+					mwEdge.r, mwEdge.g, mwEdge.b = COL.red.r, COL.red.g, COL.red.b
+					mwEdge.a = 90 + 165 * s.hf
+					draw.RoundedBox(12, 0, 0, w, h, mwEdge)
+					draw.RoundedBox(11, 1, 1, w - 2, h - 2, mwDark)
 					if s.hf > 0.01 then
-						surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 30 * s.hf)
-						surface.DrawRect(0, 0, w, h)
+						mwFill.r, mwFill.g, mwFill.b, mwFill.a = COL.red.r, COL.red.g, COL.red.b, 30 * s.hf
+						draw.RoundedBox(11, 1, 1, w - 2, h - 2, mwFill)
 					end
-					surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 90 + 165 * s.hf)
-					surface.DrawOutlinedRect(0, 0, w, h, 1)
-					if s.hf > 0.01 then
-						surface.SetDrawColor(COL.red.r, COL.red.g, COL.red.b, 160 * s.hf)
-						surface.DrawOutlinedRect(1, 1, w - 2, h - 2, 1)
-					end
-					surface.SetDrawColor(COL.red)
-					surface.DrawRect(math.floor(w * 0.3), 0, math.ceil(w * 0.4), 3)
+
+					-- Pastille d'accent en tête, qui s'étire au survol
+					local nw = math.floor(w * (0.34 + 0.16 * s.hf))
+					draw.RoundedBox(2, math.floor((w - nw) / 2), 4, nw, 4, COL.red)
 
 					draw.SimpleText(isApp and T("APPARENCE") or T(slot.label), "SCPArmory_RoN_Label",
 						w / 2, 16, s.hf > 0.3 and COL.soft or COL.dim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)

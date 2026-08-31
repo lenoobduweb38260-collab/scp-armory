@@ -57,7 +57,10 @@ net.Receive("SCPArmory_Config", function()
 		end
 	end
 
-	SCPArmory.ApplyPendingItemConfig()
+	-- Re-passe du chargement automatique (sans doublons) : la config reçue
+	-- peut ajouter des préfixes de packs (MRS…) inconnus au démarrage local,
+	-- puis application des icônes / restrictions
+	SCPArmory.AutoLoadWeapons()
 end)
 
 hook.Add("InitPostEntity", "SCPArmory_RequestConfig", function()
@@ -212,7 +215,8 @@ function SCPArmory.OpenConfigMenu()
 
 	local checks, nums = {}, {}
 	local lockerEntry
-	local bgURLEntry, bgWeaponURLEntry
+	local prefixEntry
+	local bgEntries = {}
 
 	local function AddCheck(key, label)
 		local btn = scroll:Add("DButton")
@@ -298,16 +302,24 @@ function SCPArmory.OpenConfigMenu()
 
 	frame.OnRemove = ClosePopup
 
-	local function JobSummary(set)
+	-- isWeapon : pour une ARME, aucun métier coché = donnée à PERSONNE
+	-- (défaut) et l'entrée « * » = tous les métiers ; pour les autres objets
+	-- aucun coché = visible par tous, comme avant
+	local function JobSummary(set, isWeapon)
+		if set["*"] then return "TOUS LES JOBS" end
 		local names = {}
-		for nm in pairs(set) do table.insert(names, nm) end
+		for nm in pairs(set) do
+			if nm ~= "*" then table.insert(names, nm) end
+		end
 		table.sort(names)
-		if #names == 0 then return "TOUS LES JOBS" end
+		if #names == 0 then
+			return isWeapon and "PERSONNE (DÉFAUT)" or "TOUS LES JOBS"
+		end
 		if #names <= 2 then return SCPArmory.FrUpper(table.concat(names, ", ")) end
 		return #names .. " JOBS AUTORISÉS"
 	end
 
-	local function OpenJobDropdown(btn, set)
+	local function OpenJobDropdown(btn, set, isWeapon)
 		ClosePopup()
 
 		-- Clic hors de la liste = fermeture
@@ -324,7 +336,8 @@ function SCPArmory.OpenConfigMenu()
 		local seen = {}
 		for _, nm in ipairs(names) do seen[nm] = true end
 		for nm in pairs(set) do
-			if not seen[nm] then table.insert(names, nm) end
+			-- « * » (tous les métiers) a sa propre ligne, pas une ligne de job
+			if not seen[nm] and nm ~= "*" then table.insert(names, nm) end
 		end
 
 		local jobColors = {}
@@ -333,7 +346,8 @@ function SCPArmory.OpenConfigMenu()
 		end
 
 		local rowH = 24
-		local listH = math.min(#names * rowH, 10 * rowH)
+		local extraRows = isWeapon and 1 or 0
+		local listH = math.min((#names + extraRows) * rowH, 10 * rowH)
 		local popW = 340
 		local popH = listH + 30
 
@@ -357,7 +371,8 @@ function SCPArmory.OpenConfigMenu()
 			surface.DrawRect(0, 0, w, 2)
 			surface.SetDrawColor(COL.line)
 			surface.DrawOutlinedRect(0, 0, w, h, 1)
-			draw.SimpleText("JOBS AUTORISÉS — AUCUN COCHÉ = TOUS", "SCPArmory_Cfg_Small", 8, 8, COL.dim)
+			draw.SimpleText(isWeapon and "MÉTIERS — AUCUN COCHÉ = ARME DONNÉE À PERSONNE"
+				or "JOBS AUTORISÉS — AUCUN COCHÉ = TOUS", "SCPArmory_Cfg_Small", 8, 8, COL.dim)
 		end
 
 		local list = vgui.Create("DScrollPanel", pop)
@@ -370,6 +385,40 @@ function SCPArmory.OpenConfigMenu()
 		lbar.btnUp.Paint = function() end
 		lbar.btnDown.Paint = function() end
 		lbar.btnGrip.Paint = function(_, w, h) draw.RoundedBox(2, 0, 0, w, h, COL.faint) end
+
+		-- Armes : première ligne « TOUS LES MÉTIERS » (coche l'entrée « * »
+		-- et remplace les métiers cochés individuellement)
+		if isWeapon then
+			local allRow = list:Add("DButton")
+			allRow:Dock(TOP)
+			allRow:SetTall(rowH)
+			allRow:SetText("")
+			allRow.Paint = function(s, w, h)
+				if s:IsHovered() then
+					surface.SetDrawColor(255, 255, 255, 8)
+					surface.DrawRect(0, 0, w, h)
+				end
+				surface.SetDrawColor(s:IsHovered() and COL.text or COL.line)
+				surface.DrawOutlinedRect(8, 5, 14, 14, 1)
+				if set["*"] then
+					surface.SetDrawColor(COL.red)
+					surface.DrawRect(11, 8, 8, 8)
+				end
+				draw.SimpleText("TOUS LES MÉTIERS", "SCPArmory_Cfg_Small", 30, h / 2,
+					set["*"] and COL.text or COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+				surface.SetDrawColor(COL.line)
+				surface.DrawRect(0, h - 1, w, 1)
+			end
+			allRow.DoClick = function()
+				if set["*"] then
+					set["*"] = nil
+				else
+					for k in pairs(set) do set[k] = nil end
+					set["*"] = true
+				end
+				surface.PlaySound("ui/buttonclick.wav")
+			end
+		end
 
 		for _, nm in ipairs(names) do
 			local row = list:Add("DButton")
@@ -396,6 +445,8 @@ function SCPArmory.OpenConfigMenu()
 				end
 			end
 			row.DoClick = function()
+				-- Cocher un métier précis remplace « TOUS LES MÉTIERS »
+				set["*"] = nil
 				set[nm] = (not set[nm]) or nil
 				surface.PlaySound("ui/buttonclick.wav")
 			end
@@ -410,6 +461,25 @@ function SCPArmory.OpenConfigMenu()
 	AddCheck("AutoLoadWeapons", "Charger automatiquement les armes des packs installés (ARC9, M9K…) — appliqué au prochain redémarrage")
 	AddCheck("MenuScene", "Fond d'armurerie dans le menu : râteliers derrière l'opérateur, établi sous l'arme")
 	AddNumber("UseDistance", "Portée autour de l'armoire (unités)", 60, 512)
+
+	-- Packs d'armes non détectés automatiquement (MRS…) : préfixes de classes
+	Note("Packs non détectés (MRS…) : préfixes de classes d'armes chargés même sans être spawnables, séparés par des virgules.")
+	do
+		local pnl = scroll:Add("DPanel")
+		pnl:Dock(TOP)
+		pnl:DockMargin(0, 4, 12, 0)
+		pnl:SetTall(26)
+		pnl.Paint = function(_, _, h)
+			draw.SimpleText("Préfixes de classes à charger (addon MRS…)", "SCPArmory_Cfg_Small",
+				0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		end
+
+		prefixEntry = vgui.Create("DTextEntry", pnl)
+		prefixEntry:Dock(RIGHT)
+		prefixEntry:SetWide(560)
+		prefixEntry:SetText(SCPArmory.Config.ForceLoadPrefixes or "mrs_")
+		StyleEntry(prefixEntry, "mrs_, autre_prefixe_")
+	end
 
 	-- Langue de l'interface : appliquée à tous les joueurs (menu, notifications,
 	-- étiquette de l'armoire) dès l'enregistrement de la configuration
@@ -579,42 +649,32 @@ function SCPArmory.OpenConfigMenu()
 		end
 	end
 
-	-- Fond du menu : VOTRE image affichée telle quelle derrière l'opérateur
-	Note("Fond personnalisé : collez l'URL directe (https) de votre image — hébergez-la sur imgur par exemple.")
-	Note("Elle s'affiche telle quelle en fond du menu. Champ vide = fond livré avec l'addon.")
+	-- Fonds du menu : VOTRE image affichée telle quelle, un fond par lieu
+	-- (écran opérateur / écran arme) et par style d'interface
+	Note("Fonds personnalisés : collez l'URL directe (https) de votre image — hébergez-la sur imgur par exemple.")
+	Note("Un fond par lieu et par style. Champ vide = fond livré avec l'addon.")
 
-	do
-		local pnl = scroll:Add("DPanel")
-		pnl:Dock(TOP)
-		pnl:DockMargin(0, 8, 12, 0)
-		pnl:SetTall(26)
-		pnl.Paint = function(_, _, h)
-			draw.SimpleText("Fond du menu (écran opérateur)", "SCPArmory_Cfg_Small",
-				0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-		end
-
-		bgURLEntry = vgui.Create("DTextEntry", pnl)
-		bgURLEntry:Dock(RIGHT)
-		bgURLEntry:SetWide(620)
-		bgURLEntry:SetText(SCPArmory.Config.MenuBGURL or "")
-		StyleEntry(bgURLEntry, "https://i.imgur.com/XXXXXXX.jpeg")
-	end
-
-	do
+	for _, def in ipairs({
+		{ key = "MenuBGRonURL",       label = "READY OR NOT — fond de l'écran opérateur (loadout)" },
+		{ key = "MenuBGRonWeaponURL", label = "READY OR NOT — fond de l'écran modification d'arme" },
+		{ key = "MenuBGMwURL",        label = "MODERN WARFARE — fond de l'écran des cartes" },
+		{ key = "MenuBGMwWeaponURL",  label = "MODERN WARFARE — fond de l'écran modification d'arme" },
+	}) do
 		local pnl = scroll:Add("DPanel")
 		pnl:Dock(TOP)
 		pnl:DockMargin(0, 6, 12, 0)
 		pnl:SetTall(26)
 		pnl.Paint = function(_, _, h)
-			draw.SimpleText("Fond du menu (écran modification d'arme)", "SCPArmory_Cfg_Small",
+			draw.SimpleText(def.label, "SCPArmory_Cfg_Small",
 				0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 		end
 
-		bgWeaponURLEntry = vgui.Create("DTextEntry", pnl)
-		bgWeaponURLEntry:Dock(RIGHT)
-		bgWeaponURLEntry:SetWide(620)
-		bgWeaponURLEntry:SetText(SCPArmory.Config.MenuBGWeaponURL or "")
-		StyleEntry(bgWeaponURLEntry, "https://i.imgur.com/XXXXXXX.jpeg")
+		local entry = vgui.Create("DTextEntry", pnl)
+		entry:Dock(RIGHT)
+		entry:SetWide(560)
+		entry:SetText(SCPArmory.Config[def.key] or "")
+		StyleEntry(entry, "https://i.imgur.com/XXXXXXX.jpeg")
+		bgEntries[def.key] = entry
 	end
 
 	Section("JOURNAUX")
@@ -686,12 +746,15 @@ function SCPArmory.OpenConfigMenu()
 
 	Section("OBJETS — IMAGE IMGUR ET JOBS AUTORISÉS")
 	Note("Image : lien direct i.imgur.com en .png ou .jpg (vide = rendu 3D du modèle).")
-	Note("Jobs : liste déroulante multi-sélection alimentée par les métiers du serveur. Aucun job coché = visible par tous.")
+	Note("ARMES : par défaut une arme n'est donnée à PERSONNE. Cochez ses métiers, ou TOUS LES MÉTIERS pour tout le monde.")
+	Note("Autres objets (tactique, grenades, gilets, casques) : aucun job coché = visible par tous, comme avant.")
 
 	local iconEntries, jobSelections = {}, {}
 
 	for _, group in ipairs(POOL_LABELS) do
 		local items = SCPArmory.Items[group.pool] or {}
+		-- Les pools principale/secondaire sont des ARMES : défaut « personne »
+		local isWeaponPool = (group.pool == "primary" or group.pool == "secondary")
 		local shown = {}
 		for _, item in ipairs(items) do
 			if item.id ~= "none" then table.insert(shown, item) end
@@ -751,14 +814,14 @@ function SCPArmory.OpenConfigMenu()
 					surface.DrawRect(0, 0, w, h)
 					surface.SetDrawColor(s:IsHovered() and COL.red or COL.line)
 					surface.DrawOutlinedRect(0, 0, w, h, 1)
-					local summary = JobSummary(set)
+					local summary = JobSummary(set, isWeaponPool)
 					local col = next(set) and COL.text or COL.faint
 					draw.SimpleText(summary, "SCPArmory_Cfg_Small", 6, h / 2, col, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 					draw.SimpleText("▼", "SCPArmory_Cfg_Small", w - 8, h / 2, COL.dim, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 				end
 				jobBtn.DoClick = function(s)
 					surface.PlaySound("ui/buttonclick.wav")
-					OpenJobDropdown(s, set)
+					OpenJobDropdown(s, set, isWeaponPool)
 				end
 
 				row.PerformLayout = function(_, w, h)
@@ -797,12 +860,15 @@ function SCPArmory.OpenConfigMenu()
 		payload.config.UITheme = themeSel
 
 		-- Fonds personnalisés : URL https directe, ou vide pour le fond livré
-		for key, entry in pairs({ MenuBGURL = bgURLEntry, MenuBGWeaponURL = bgWeaponURLEntry }) do
+		for key, entry in pairs(bgEntries) do
 			local url = string.Trim(entry:GetValue() or "")
 			if url == "" or string.find(url, "^https?://") then
 				payload.config[key] = url
 			end
 		end
+
+		-- Préfixes de packs forcés (MRS…)
+		payload.config.ForceLoadPrefixes = string.Trim(prefixEntry:GetValue() or "")
 
 		for key, entry in pairs(iconEntries) do
 			local url = string.Trim(entry:GetValue() or "")
