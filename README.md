@@ -40,7 +40,8 @@ restrictions par job et **chargement automatique des packs d'armes installés**.
 - **Entité armoire d'armurerie** (`scp_armory_locker`) : une armoire à placer sur la map (menu spawn,
   catégorie *SCP Armory*, modèle configurable), étiquette 3D2D « ARMURERIE — Appuyez sur [E] ».
   Avec `RequireEntity = true`, s'équiper n'est possible **qu'à proximité d'une armoire**.
-- **Sauvegarde locale** du dernier loadout + réapplication optionnelle au respawn.
+- **Sauvegarde locale** du dernier loadout : le menu se rouvre pré-rempli. Aucune
+  réapplication automatique au respawn — il faut repasser à l'armurerie.
 - **Interface en 3 langues** : français (défaut), **allemand** et **polonais**. La langue se choisit
   dans le panneau de configuration (section GÉNÉRAL) et s'applique en direct à tous les joueurs :
   menu, notifications, menu d'apparence et étiquette 3D2D de l'armoire.
@@ -122,8 +123,6 @@ configuration en jeu) :
 | `BaseWalkSpeed` / `BaseRunSpeed` | Vitesses de référence avant malus de poids |
 | `MaxArmor` | Plafond d'armure |
 | `KeepWeapons` | Outils sandbox redonnés après déploiement (physgun, toolgun…) |
-
-ConVar serveur : `scp_armory_autoapply 1/0` — autorise la réapplication du loadout au respawn.
 
 ## Journaux (logs staff)
 

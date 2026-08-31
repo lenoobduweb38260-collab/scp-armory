@@ -49,6 +49,8 @@ local mwFill = Color(190, 34, 28, 0)
 local mwEdge = Color(190, 34, 28, 90)
 local mwDark = Color(12, 12, 15, 235)
 local mwGloss = Color(255, 255, 255, 0)
+local btnPress = Color(0, 0, 0, 70)
+local chevCol = Color(255, 255, 255, 0)
 
 -- Matériaux (fonds et habillage du thème légion) : depuis materials/ (addon
 -- sur le disque) ou, en mode chargeur cloud, depuis data/scp_armory/ où le
@@ -234,7 +236,6 @@ end
 
 local function LoadSaved()
 	local sel = SCPArmory.DefaultLoadout()
-	local auto = true
 	local atts = { primary = {}, secondary = {} }
 
 	if file.Exists(SAVE_FILE, "DATA") then
@@ -246,7 +247,6 @@ local function LoadSaved()
 					sel[slot.key] = id
 				end
 			end
-			if tbl.__auto ~= nil then auto = tobool(tbl.__auto) end
 
 			-- Les clés JSON redeviennent des chaînes : re-typer les index
 			if istable(tbl.__atts) then
@@ -292,13 +292,12 @@ local function LoadSaved()
 		atts[wkey] = clean
 	end
 
-	return sel, auto, atts
+	return sel, atts
 end
 
-local function SaveSelection(sel, auto, atts)
+local function SaveSelection(sel, atts)
 	file.CreateDir(SAVE_DIR)
 	local tbl = table.Copy(sel)
-	tbl.__auto = auto
 	tbl.__atts = atts
 	file.Write(SAVE_FILE, util.TableToJSON(tbl, true))
 end
@@ -314,7 +313,7 @@ local function OpenMenu()
 	-- Espacement des lignes selon le style
 	local rowGap = (uiStyle == "mw") and 4 or 0
 
-	local selection, autoApply, attSel = LoadSaved()
+	local selection, attSel = LoadSaved()
 	local plyModel = LocalPlayer():GetModel()
 
 	local jobName = team.GetName(LocalPlayer():Team()) or ""
@@ -904,7 +903,7 @@ local function OpenMenu()
 	local colX, colY = 48, 34
 	local colW = math.Clamp(math.floor(ScrW() * 0.22), 320, 420)
 	local colH = ScrH() - colY * 2
-	local bottomH = 184
+	local bottomH = 158
 	local titleH = 112
 
 	local column = vgui.Create("DPanel", frame)
@@ -1134,29 +1133,6 @@ local function OpenMenu()
 		end
 	end
 
-	-- Case à cocher stylée RoN (la DCheckBoxLabel de base jure avec le thème)
-	local autoChk = vgui.Create("DButton", bottom)
-	autoChk:SetPos(0, bottomH - 76)
-	autoChk:SetSize(colW, 20)
-	autoChk:SetText("")
-	autoChk.checked = autoApply
-	autoChk.GetChecked = function(s) return s.checked end
-	autoChk.Paint = function(s, _, h)
-		local hov = s:IsHovered()
-		surface.SetDrawColor(hov and COL.text or COL.line)
-		surface.DrawOutlinedRect(0, 3, 14, 14, 1)
-		if s.checked then
-			surface.SetDrawColor(COL.red)
-			surface.DrawRect(3, 6, 8, 8)
-		end
-		draw.SimpleText(T("Réappliquer ce chargement au respawn"), "SCPArmory_RoN_Small", 22, h / 2,
-			hov and COL.soft or COL.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-	end
-	autoChk.DoClick = function(s)
-		s.checked = not s.checked
-		surface.PlaySound("ui/buttonclick.wav")
-	end
-
 	local backW = 118
 	local deployBtn = vgui.Create("DButton", bottom)
 	deployBtn:SetPos(0, bottomH - 46)
@@ -1164,6 +1140,7 @@ local function OpenMenu()
 	deployBtn:SetText("")
 	deployBtn.Paint = function(s, w, h)
 		s.hf = Lerp(FrameTime() * 10, s.hf or 0, s:IsHovered() and 1 or 0)
+		local down = s:IsDown()
 
 		-- Respiration discrète au repos
 		local pulse = (1 - s.hf) * math.sin(RealTime() * 2.2) * 7
@@ -1176,18 +1153,33 @@ local function OpenMenu()
 		local br = (uiStyle == "mw") and 8 or 0
 		draw.RoundedBox(br, 0, 0, w, h, btnBG)
 
-		-- Liseré blanc qui s'allume au survol
-		if s.hf > 0.02 then
-			if br > 0 then
-				mwGloss.a = 26 * s.hf
-				draw.RoundedBox(br, 0, 0, w, h / 2, mwGloss)
-			else
-				surface.SetDrawColor(255, 255, 255, 60 * s.hf)
-				surface.DrawOutlinedRect(3, 3, w - 6, h - 6, 1)
-			end
+		-- Relief : reflet permanent en tête, renforcé au survol
+		mwGloss.a = 12 + 22 * s.hf
+		draw.RoundedBox(br, 0, 0, w, math.floor(h / 2), mwGloss)
+
+		-- Liseré blanc qui s'allume au survol (style plat RoN)
+		if br == 0 and s.hf > 0.02 then
+			surface.SetDrawColor(255, 255, 255, 60 * s.hf)
+			surface.DrawOutlinedRect(3, 3, w - 6, h - 6, 1)
 		end
 
-		draw.SimpleText(T("DÉPLOYER"), "SCPArmory_RoN_Btn", w / 2, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		-- Enfoncé : le bouton s'assombrit et le texte descend d'un pixel
+		if down then
+			btnPress.a = 60
+			draw.RoundedBox(br, 0, 0, w, h, btnPress)
+		end
+
+		-- Le libellé glisse vers la gauche au survol, chevrons à droite
+		local label = T("DÉPLOYER")
+		surface.SetFont("SCPArmory_RoN_Btn")
+		local tw = surface.GetTextSize(label)
+		local ty = h / 2 + (down and 1 or 0)
+		draw.SimpleText(label, "SCPArmory_RoN_Btn", w / 2 - 9 * s.hf, ty, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		if s.hf > 0.05 then
+			chevCol.a = 255 * s.hf
+			local cx = w / 2 - 9 * s.hf + tw / 2 + 8 + math.sin(RealTime() * 6) * 2
+			draw.SimpleText("»", "SCPArmory_RoN_Btn", cx, ty - 1, chevCol, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		end
 
 		-- Flash au clic
 		if s.flashT then
@@ -1205,7 +1197,6 @@ local function OpenMenu()
 		for _, slot in ipairs(SCPArmory.Slots) do
 			net.WriteString(selection[slot.key] or "none")
 		end
-		net.WriteBool(autoChk:GetChecked())
 		for _, wkey in ipairs(WEAPON_KEYS) do
 			local map = attSel[wkey] or {}
 			net.WriteUInt(math.min(table.Count(map), 63), 6)
@@ -1228,7 +1219,7 @@ local function OpenMenu()
 
 		net.SendToServer()
 
-		SaveSelection(selection, autoChk:GetChecked(), attSel)
+		SaveSelection(selection, attSel)
 		surface.PlaySound("items/ammo_pickup.wav")
 
 		-- Déployer referme l'armurerie (en fondu)
@@ -1281,11 +1272,22 @@ local function OpenMenu()
 	backBtn:SetText("")
 	backBtn.Paint = function(s, w, h)
 		s.hf = Lerp(FrameTime() * 10, s.hf or 0, s:IsHovered() and 1 or 0)
+		local down = s:IsDown()
 
 		local br = (uiStyle == "mw") and 8 or 0
-		backBG.a = 18 + 34 * s.hf
-		draw.RoundedBox(br, 0, 0, w, h, backBG)
-		if br == 0 then
+		if br > 0 then
+			-- MW : liseré arrondi (boîte claire puis fond sombre en creux)
+			mwEdge.r = Lerp(s.hf, COL.line.r, COL.text.r)
+			mwEdge.g = Lerp(s.hf, COL.line.g, COL.text.g)
+			mwEdge.b = Lerp(s.hf, COL.line.b, COL.text.b)
+			mwEdge.a = 255
+			draw.RoundedBox(br, 0, 0, w, h, mwEdge)
+			draw.RoundedBox(br - 1, 1, 1, w - 2, h - 2, mwDark)
+			backBG.a = 12 + 30 * s.hf
+			draw.RoundedBox(br - 1, 1, 1, w - 2, h - 2, backBG)
+		else
+			backBG.a = 18 + 34 * s.hf
+			draw.RoundedBox(0, 0, 0, w, h, backBG)
 			surface.SetDrawColor(
 				Lerp(s.hf, COL.line.r, COL.text.r),
 				Lerp(s.hf, COL.line.g, COL.text.g),
@@ -1293,8 +1295,19 @@ local function OpenMenu()
 			surface.DrawOutlinedRect(0, 0, w, h, 1)
 		end
 
-		draw.SimpleText(T("RETOUR"), "SCPArmory_RoN_Btn", w / 2 - 12, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-		draw.SimpleText("ESC", "SCPArmory_RoN_Small", w - 10, h / 2, COL.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+		if down then
+			btnPress.a = 50
+			draw.RoundedBox(br, 0, 0, w, h, btnPress)
+		end
+
+		-- Chevron qui glisse vers la gauche au survol
+		local ty = h / 2 + (down and 1 or 0)
+		if s.hf > 0.05 then
+			chevCol.a = 255 * s.hf
+			draw.SimpleText("«", "SCPArmory_RoN_Btn", 10 - 3 * s.hf, ty - 1, chevCol, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		end
+		draw.SimpleText(T("RETOUR"), "SCPArmory_RoN_Btn", w / 2 - 12 + 3 * s.hf, ty, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText("ESC", "SCPArmory_RoN_Small", w - 10, ty, COL.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 	end
 	backBtn.DoClick = GoBack
 
@@ -1857,37 +1870,19 @@ local function OpenMenu()
 		local strip = vgui.Create("DPanel", frame)
 		strip.Paint = function() end
 
-		-- Barre d'action : respawn, RETOUR et grand DÉPLOYER
+		-- Barre d'action : RETOUR et grand DÉPLOYER
 		local bar = vgui.Create("DPanel", frame)
-		bar:SetSize(660, 56)
-		bar:SetPos(ScrW() - 660 - 48, ScrH() - 82)
+		bar:SetSize(414, 60)
+		bar:SetPos(ScrW() - 414 - 48, ScrH() - 86)
 		bar.Paint = function() end
 
-		local mwChk = vgui.Create("DButton", bar)
-		mwChk:SetPos(0, 18)
-		mwChk:SetSize(260, 20)
-		mwChk:SetText("")
-		mwChk.Paint = function(s, _, h)
-			local hov = s:IsHovered()
-			draw.RoundedBox(4, 0, 3, 14, 14, hov and COL.text or COL.line)
-			draw.RoundedBox(3, 1, 4, 12, 12, mwDark)
-			if autoChk.checked then
-				draw.RoundedBox(2, 3, 6, 8, 8, COL.red)
-			end
-			draw.SimpleText(T("Réappliquer ce chargement au respawn"), "SCPArmory_RoN_Small", 22, h / 2,
-				hov and COL.soft or COL.dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-		end
-		mwChk.DoClick = function()
-			autoChk.checked = not autoChk.checked
-			surface.PlaySound("ui/buttonclick.wav")
-		end
-
 		local mwBack = vgui.Create("DButton", bar)
-		mwBack:SetPos(280, 0)
-		mwBack:SetSize(130, 56)
+		mwBack:SetPos(0, 0)
+		mwBack:SetSize(140, 60)
 		mwBack:SetText("")
 		mwBack.Paint = function(s, w, h)
 			s.hf = Lerp(FrameTime() * 10, s.hf or 0, s:IsHovered() and 1 or 0)
+			local down = s:IsDown()
 
 			-- Bouton arrondi à liseré : boîte claire, puis fond sombre en creux
 			mwEdge.r = Lerp(s.hf, COL.line.r, COL.text.r)
@@ -1898,39 +1893,68 @@ local function OpenMenu()
 			draw.RoundedBox(11, 1, 1, w - 2, h - 2, mwDark)
 			backBG.a = 14 + 30 * s.hf
 			draw.RoundedBox(11, 1, 1, w - 2, h - 2, backBG)
+			if down then
+				btnPress.a = 50
+				draw.RoundedBox(12, 0, 0, w, h, btnPress)
+			end
 
-			draw.SimpleText(T("RETOUR"), "SCPArmory_RoN_Btn", w / 2 - 12, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-			draw.SimpleText("ESC", "SCPArmory_RoN_Small", w - 12, h / 2, COL.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+			-- Chevron qui glisse vers la gauche au survol
+			local ty = h / 2 + (down and 1 or 0)
+			if s.hf > 0.05 then
+				chevCol.a = 255 * s.hf
+				draw.SimpleText("«", "SCPArmory_RoN_Btn", 12 - 3 * s.hf, ty - 1, chevCol, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			end
+			draw.SimpleText(T("RETOUR"), "SCPArmory_RoN_Btn", w / 2 - 10 + 3 * s.hf, ty, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			draw.SimpleText("ESC", "SCPArmory_RoN_Small", w - 12, ty, COL.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 		end
 		mwBack.DoClick = GoBack
 
 		local mwDeploy = vgui.Create("DButton", bar)
-		mwDeploy:SetPos(430, 0)
-		mwDeploy:SetSize(230, 56)
+		mwDeploy:SetPos(160, 0)
+		mwDeploy:SetSize(254, 60)
 		mwDeploy:SetText("")
 		mwDeploy.Paint = function(s, w, h)
 			s.hf = Lerp(FrameTime() * 10, s.hf or 0, s:IsHovered() and 1 or 0)
+			local down = s:IsDown()
 			local pulse = (1 - s.hf) * math.sin(RealTime() * 2.2) * 7
+
+			-- Halo d'accent qui respire autour du bouton
+			mwFill.r, mwFill.g, mwFill.b = COL.red.r, COL.red.g, COL.red.b
+			mwFill.a = 70 + 26 * math.sin(RealTime() * 2.2) + 90 * s.hf
+			draw.RoundedBox(14, 0, 0, w, h, mwFill)
 
 			btnBG.r = math.Clamp(Lerp(s.hf, COL.red.r, COL.redHi.r) + pulse, 0, 255)
 			btnBG.g = math.Clamp(Lerp(s.hf, COL.red.g, COL.redHi.g) + pulse * 0.3, 0, 255)
 			btnBG.b = math.Clamp(Lerp(s.hf, COL.red.b, COL.redHi.b) + pulse * 0.3, 0, 255)
-			draw.RoundedBox(12, 0, 0, w, h, btnBG)
+			draw.RoundedBox(12, 2, 2, w - 4, h - 4, btnBG)
 
-			-- Reflet en tête qui s'allume au survol
-			if s.hf > 0.02 then
-				mwGloss.a = 30 * s.hf
-				draw.RoundedBox(12, 0, 0, w, h / 2, mwGloss)
+			-- Relief : reflet permanent en tête, renforcé au survol
+			mwGloss.a = 14 + 26 * s.hf
+			draw.RoundedBox(12, 2, 2, w - 4, math.floor(h / 2) - 2, mwGloss)
+
+			if down then
+				btnPress.a = 60
+				draw.RoundedBox(12, 2, 2, w - 4, h - 4, btnPress)
 			end
 
-			draw.SimpleText(T("DÉPLOYER"), "SCPArmory_RoN_Btn", w / 2, h / 2 - 8, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-			draw.SimpleText(T("REJOINDRE LA BATAILLE"), "SCPArmory_RoN_Small", w / 2, h / 2 + 11, COL.soft, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			-- Libellé + chevrons animés, sous-titre façon MW
+			local label = T("DÉPLOYER")
+			surface.SetFont("SCPArmory_RoN_Btn")
+			local tw = surface.GetTextSize(label)
+			local ty = h / 2 - 8 + (down and 1 or 0)
+			draw.SimpleText(label, "SCPArmory_RoN_Btn", w / 2 - 9 * s.hf, ty, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			if s.hf > 0.05 then
+				chevCol.a = 255 * s.hf
+				local cx = w / 2 - 9 * s.hf + tw / 2 + 8 + math.sin(RealTime() * 6) * 2
+				draw.SimpleText("»", "SCPArmory_RoN_Btn", cx, ty - 1, chevCol, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			end
+			draw.SimpleText(T("REJOINDRE LA BATAILLE"), "SCPArmory_RoN_Small", w / 2, ty + 19, COL.soft, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
 			if s.flashT then
 				local fa = 1 - (RealTime() - s.flashT) / 0.25
 				if fa > 0 then
 					flashBG.a = 170 * fa
-					draw.RoundedBox(12, 0, 0, w, h, flashBG)
+					draw.RoundedBox(12, 2, 2, w - 4, h - 4, flashBG)
 				end
 			end
 		end

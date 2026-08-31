@@ -10,11 +10,7 @@ util.AddNetworkString("SCPArmory_RequestConfig")
 util.AddNetworkString("SCPArmory_ApplyBG")
 util.AddNetworkString("SCPArmory_OpenBG")
 
-local cvarAutoApply = CreateConVar("scp_armory_autoapply", "1", FCVAR_ARCHIVE,
-	"Réapplique automatiquement le dernier loadout au respawn (si le joueur l'a demandé).")
-
-SCPArmory.Stored = SCPArmory.Stored or {}   -- clé joueur -> loadout
-SCPArmory.AutoFlag = SCPArmory.AutoFlag or {} -- clé joueur -> bool (réappliquer au respawn)
+SCPArmory.Stored = SCPArmory.Stored or {} -- clé joueur -> dernier loadout déployé
 
 local function Notify(ply, msg)
 	if IsValid(ply) then ply:ChatPrint("[ARMURERIE] " .. msg) end
@@ -158,8 +154,6 @@ net.Receive("SCPArmory_Apply", function(_, ply)
 		end
 	end
 
-	local autoApply = net.ReadBool()
-
 	-- Accessoires ARC9 choisis pour les armes principale et secondaire,
 	-- validés contre le registre ARC9 (emplacement + compatibilité)
 	local atts = {}
@@ -200,7 +194,6 @@ net.Receive("SCPArmory_Apply", function(_, ply)
 
 	local sid = StoreKey(ply)
 	SCPArmory.Stored[sid] = loadout
-	SCPArmory.AutoFlag[sid] = autoApply
 
 	if refused then
 		Notify(ply, SCPArmory.T("Certains objets ne sont pas autorisés pour votre métier et ont été retirés."))
@@ -211,7 +204,7 @@ net.Receive("SCPArmory_Apply", function(_, ply)
 
 	SCPArmory.Apply(ply, loadout)
 
-	-- Journal du déploiement (les ré-applications au respawn ne sont pas loguées)
+	-- Journal du déploiement
 	local attCount = 0
 	for _, map in pairs(loadout.atts or {}) do
 		for _ in pairs(map) do attCount = attCount + 1 end
@@ -224,22 +217,11 @@ net.Receive("SCPArmory_Apply", function(_, ply)
 		attCount, stats.weight, stats.mobility, stats.armor), ply)
 end)
 
--- Réapplication au respawn + remise à zéro des effets
+-- Remise à zéro des effets de vitesse au respawn — le loadout ne se
+-- réapplique JAMAIS automatiquement : il faut repasser à l'armurerie
 hook.Add("PlayerSpawn", "SCPArmory_Respawn", function(ply)
 	ply:SetWalkSpeed(SCPArmory.Config.BaseWalkSpeed)
 	ply:SetRunSpeed(SCPArmory.Config.BaseRunSpeed)
-
-	if not cvarAutoApply:GetBool() then return end
-
-	local sid = StoreKey(ply)
-	local loadout = SCPArmory.Stored[sid]
-	if not loadout or not SCPArmory.AutoFlag[sid] then return end
-
-	timer.Simple(0.2, function()
-		if IsValid(ply) and ply:Alive() then
-			SCPArmory.Apply(ply, loadout)
-		end
-	end)
 end)
 
 -- Commandes chat : armurerie + panneau de configuration
@@ -338,7 +320,6 @@ end)
 hook.Add("PlayerDisconnected", "SCPArmory_Cleanup", function(ply)
 	local sid = StoreKey(ply)
 	SCPArmory.Stored[sid] = nil
-	SCPArmory.AutoFlag[sid] = nil
 	if SCPArmory.StoredBG then SCPArmory.StoredBG[sid] = nil end
 end)
 
