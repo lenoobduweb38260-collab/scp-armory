@@ -5,8 +5,8 @@ Addon **Garry's Mod** : une armurerie de la Fondation SCP qui recrée les écran
 opérateur (ou arme) en grand plan, accessoires **ARC9**, poids qui pénalise la mobilité,
 restrictions par job et **chargement automatique des packs d'armes installés**.
 
-![Écran LOADOUT — habillage cartes](docs/apercu-cartes.png)
 ![Écran LOADOUT](docs/apercu-loadout.png)
+![Écran LOADOUT — thème Modern Warfare](docs/apercu-mw.png)
 ![Écran MODIFIER L'ARME](docs/apercu-modify.png)
 
 ## Fonctionnalités
@@ -44,13 +44,15 @@ restrictions par job et **chargement automatique des packs d'armes installés**.
 - **Interface en 3 langues** : français (défaut), **allemand** et **polonais**. La langue se choisit
   dans le panneau de configuration (section GÉNÉRAL) et s'applique en direct à tous les joueurs :
   menu, notifications, menu d'apparence et étiquette 3D2D de l'armoire.
-- **7 styles d'interface au choix dans la config** : **CARTES** (panneaux translucides
-  arrondis, dégradé d'accent — défaut), **READY OR NOT** (plat et épuré, fidèle au jeu),
-  **MODERN WARFARE** (anguleux, surlignage d'accent), **HOLOGRAMME** (boîtes bordées,
-  chevrons, coins lumineux), **CYBER SCP** (bordures vives sur fond nuit), **SOMBRE
-  TACTIQUE** (minimal) et **LÉGION HOLO** (panneaux, plaques et écusson dessinés par des
-  images générées livrées dans `materials/scp_armory/holo_*`, rendues en 9 tranches).
-  Appliqué à tous les joueurs en direct.
+- **2 styles d'interface au choix dans la config** : **READY OR NOT** (plat et épuré,
+  fidèle au jeu — défaut) et **MODERN WARFARE** (la vue d'ensemble devient un écran de
+  sélection façon **killstreaks** : grandes cartes anguleuses en bas de l'écran, une par
+  emplacement + APPARENCE, opérateur au centre, barre DÉPLOYER en bas à droite ; les
+  sous-écrans gardent la colonne classique). Appliqué à tous les joueurs en direct.
+- **Fond du menu personnalisable** : collez l'URL directe (https) de **votre image**
+  dans la config (section INTERFACE) — un champ pour l'écran opérateur, un pour l'écran
+  de modification d'arme. L'image est affichée telle quelle (recadrée plein écran, avec
+  la parallaxe). Champ vide = fonds livrés avec l'addon (`bg_racks` / `bg_table`).
 - **Couleur d'accent configurable partout** (menu, apparence, panneau de config) :
   curseurs RVB + 8 couleurs prédéfinies avec aperçu en direct dans la config en jeu.
 - **Mise à jour automatique au démarrage** (dossier [`maj-auto/`](maj-auto/LISEZMOI.md)) :

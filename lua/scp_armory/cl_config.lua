@@ -212,6 +212,7 @@ function SCPArmory.OpenConfigMenu()
 
 	local checks, nums = {}, {}
 	local lockerEntry
+	local bgURLEntry, bgWeaponURLEntry
 
 	local function AddCheck(key, label)
 		local btn = scroll:Add("DButton")
@@ -464,17 +465,12 @@ function SCPArmory.OpenConfigMenu()
 	Note("Style et couleur d'accent appliqués à tous les joueurs (pris en compte à l'ouverture de leur prochain menu).")
 	Note("Choisir un style règle aussi sa couleur signature — modifiable ensuite avec les curseurs.")
 
-	local themeSel = SCPArmory.Config.UITheme or "cartes"
+	local themeSel = (SCPArmory.Config.UITheme == "mw") and "mw" or "ron"
 	do
 		-- Chaque style porte sa couleur signature, posée sur les curseurs au clic
 		local THEMES = {
-			{ code = "cartes", label = "CARTES", sig = { 190, 34, 28 } },
 			{ code = "ron", label = "READY OR NOT", sig = { 190, 34, 28 } },
 			{ code = "mw", label = "MODERN WARFARE", sig = { 201, 168, 60 } },
-			{ code = "holo", label = "HOLOGRAMME", sig = { 77, 178, 255 } },
-			{ code = "cyber", label = "CYBER SCP", sig = { 58, 160, 255 } },
-			{ code = "sombre", label = "SOMBRE TACTIQUE", sig = { 61, 125, 216 } },
-			{ code = "legion", label = "LÉGION HOLO", sig = { 96, 168, 255 } },
 		}
 
 		local pnl = scroll:Add("DPanel")
@@ -581,6 +577,44 @@ function SCPArmory.OpenConfigMenu()
 				b:SetPos(w - 34 - (#swBtns - i + 1) * 28, 4)
 			end
 		end
+	end
+
+	-- Fond du menu : VOTRE image affichée telle quelle derrière l'opérateur
+	Note("Fond personnalisé : collez l'URL directe (https) de votre image — hébergez-la sur imgur par exemple.")
+	Note("Elle s'affiche telle quelle en fond du menu. Champ vide = fond livré avec l'addon.")
+
+	do
+		local pnl = scroll:Add("DPanel")
+		pnl:Dock(TOP)
+		pnl:DockMargin(0, 8, 12, 0)
+		pnl:SetTall(26)
+		pnl.Paint = function(_, _, h)
+			draw.SimpleText("Fond du menu (écran opérateur)", "SCPArmory_Cfg_Small",
+				0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		end
+
+		bgURLEntry = vgui.Create("DTextEntry", pnl)
+		bgURLEntry:Dock(RIGHT)
+		bgURLEntry:SetWide(620)
+		bgURLEntry:SetText(SCPArmory.Config.MenuBGURL or "")
+		StyleEntry(bgURLEntry, "https://i.imgur.com/XXXXXXX.jpeg")
+	end
+
+	do
+		local pnl = scroll:Add("DPanel")
+		pnl:Dock(TOP)
+		pnl:DockMargin(0, 6, 12, 0)
+		pnl:SetTall(26)
+		pnl.Paint = function(_, _, h)
+			draw.SimpleText("Fond du menu (écran modification d'arme)", "SCPArmory_Cfg_Small",
+				0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+		end
+
+		bgWeaponURLEntry = vgui.Create("DTextEntry", pnl)
+		bgWeaponURLEntry:Dock(RIGHT)
+		bgWeaponURLEntry:SetWide(620)
+		bgWeaponURLEntry:SetText(SCPArmory.Config.MenuBGWeaponURL or "")
+		StyleEntry(bgWeaponURLEntry, "https://i.imgur.com/XXXXXXX.jpeg")
 	end
 
 	Section("JOURNAUX")
@@ -761,6 +795,14 @@ function SCPArmory.OpenConfigMenu()
 		payload.config.LockerModel = lockerEntry:GetValue()
 		payload.config.Language = langSel
 		payload.config.UITheme = themeSel
+
+		-- Fonds personnalisés : URL https directe, ou vide pour le fond livré
+		for key, entry in pairs({ MenuBGURL = bgURLEntry, MenuBGWeaponURL = bgWeaponURLEntry }) do
+			local url = string.Trim(entry:GetValue() or "")
+			if url == "" or string.find(url, "^https?://") then
+				payload.config[key] = url
+			end
+		end
 
 		for key, entry in pairs(iconEntries) do
 			local url = string.Trim(entry:GetValue() or "")

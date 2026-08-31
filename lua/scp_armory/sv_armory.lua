@@ -365,6 +365,8 @@ local EDITABLE = {
 	LockerModel        = "string",
 	Language           = "string",
 	UITheme            = "string",
+	MenuBGURL          = "string",
+	MenuBGWeaponURL    = "string",
 	UIColorR           = "number",
 	UIColorG           = "number",
 	UIColorB           = "number",
@@ -374,10 +376,7 @@ local EDITABLE = {
 local VALID_LANGS = { fr = true, de = true, pl = true }
 
 -- Styles d'interface disponibles (cl_menu.lua)
-local VALID_THEMES = {
-	cartes = true, ron = true, mw = true,
-	holo = true, cyber = true, sombre = true, legion = true,
-}
+local VALID_THEMES = { ron = true, mw = true }
 
 -- Transforme "Job A, Job B" (ou une table) en liste propre de noms de jobs
 -- (bornée : 24 jobs max par objet, 64 caractères max par nom)
@@ -437,7 +436,15 @@ local function ApplyOverrides(data)
 
 	-- Le style d'interface ne peut être qu'un des styles existants
 	if not VALID_THEMES[SCPArmory.Config.UITheme] then
-		SCPArmory.Config.UITheme = "cartes"
+		SCPArmory.Config.UITheme = "ron"
+	end
+
+	-- Les fonds personnalisés doivent être des URL http(s) directes
+	for _, k in ipairs({ "MenuBGURL", "MenuBGWeaponURL" }) do
+		local v = SCPArmory.Config[k]
+		if not isstring(v) or (v ~= "" and not string.find(v, "^https?://")) then
+			SCPArmory.Config[k] = ""
+		end
 	end
 
 	-- Icônes : stockées même si l'objet n'existe pas encore

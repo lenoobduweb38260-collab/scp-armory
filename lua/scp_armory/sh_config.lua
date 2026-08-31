@@ -54,15 +54,15 @@ SCPArmory.Config = {
 	Language = "fr",
 
 	-- Style de l'interface (choix dans la config en jeu) :
-	-- "cartes" = panneaux arrondis translucides (défaut),
-	-- "ron"    = Ready or Not épuré et plat,
-	-- "mw"     = Modern Warfare anguleux, lignes surlignées à la couleur d'accent,
-	-- "holo"   = hologramme : boîtes bordées arrondies, chevrons, coins lumineux,
-	-- "cyber"  = cyber SCP : bordures vives sur fond nuit, bouton en contour,
-	-- "sombre" = tactique minimal : boîtes sombres, accent discret,
-	-- "legion" = hologramme légion : panneaux et plaques dessinés par des
-	--            images générées (materials/scp_armory/holo_*), écusson
-	UITheme = "cartes",
+	-- "ron" = Ready or Not épuré et plat (défaut),
+	-- "mw"  = Modern Warfare : sélection en grandes cartes façon killstreaks
+	UITheme = "ron",
+
+	-- Fond personnalisé du menu : URL directe (https) de VOTRE image,
+	-- affichée telle quelle derrière l'opérateur (vide = fond livré).
+	-- Deuxième URL pour l'écran de modification d'arme (vide = fond livré).
+	MenuBGURL = "",
+	MenuBGWeaponURL = "",
 
 	-- Couleur d'accent de l'interface, appliquée partout dans les menus
 	-- (rouge Fondation par défaut ; réglable dans la config en jeu)
