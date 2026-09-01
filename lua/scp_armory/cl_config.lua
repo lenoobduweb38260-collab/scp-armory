@@ -98,6 +98,9 @@ local POOL_LABELS = {
 	{ pool = "helmet",    label = "CASQUES" },
 }
 
+-- Traduction (français par défaut ; allemand/polonais selon la config)
+local function T(s) return SCPArmory.T(s) end
+
 -- Métiers réels du serveur (DarkRP crée une team par job)
 local function GetAllJobNames()
 	local names, seen = {}, {}
@@ -116,7 +119,7 @@ local activeConfig = nil
 
 function SCPArmory.OpenConfigMenu()
 	if not LocalPlayer():IsSuperAdmin() then
-		chat.AddText(COL.red, "[ARMURERIE] ", COL.text, "Réservé aux superadmins.")
+		chat.AddText(COL.red, "[ARMURERIE] ", COL.text, T("Réservé aux superadmins."))
 		return
 	end
 
@@ -143,8 +146,8 @@ function SCPArmory.OpenConfigMenu()
 	frame.Paint = function(_, w, h)
 		draw.RoundedBox(10, 0, 0, w, h, COL.bg)
 		draw.RoundedBoxEx(10, 0, 0, w, 3, COL.red, true, true, false, false)
-		draw.SimpleText("CONFIGURATION DE L'ARMURERIE", "SCPArmory_Cfg_Title", 20, 16, COL.text)
-		draw.SimpleText("SUPERADMIN — SAUVEGARDÉE CÔTÉ SERVEUR ET DIFFUSÉE À TOUS", "SCPArmory_Cfg_Small", 20, 44, COL.dim)
+		draw.SimpleText(T("CONFIGURATION DE L'ARMURERIE"), "SCPArmory_Cfg_Title", 20, 16, COL.text)
+		draw.SimpleText(T("SUPERADMIN — SAUVEGARDÉE CÔTÉ SERVEUR ET DIFFUSÉE À TOUS"), "SCPArmory_Cfg_Small", 20, 44, COL.dim)
 	end
 
 	local closeBtn = vgui.Create("DButton", frame)
@@ -171,6 +174,7 @@ function SCPArmory.OpenConfigMenu()
 	-- ------------------------------------------- petits widgets stylés RoN
 
 	local function Section(label)
+		label = T(label)
 		local pnl = scroll:Add("DPanel")
 		pnl:Dock(TOP)
 		pnl:DockMargin(0, 14, 12, 6)
@@ -183,6 +187,7 @@ function SCPArmory.OpenConfigMenu()
 	end
 
 	local function Note(text)
+		text = T(text)
 		local pnl = scroll:Add("DPanel")
 		pnl:Dock(TOP)
 		pnl:DockMargin(0, 2, 12, 2)
@@ -219,6 +224,7 @@ function SCPArmory.OpenConfigMenu()
 	local bgEntries = {}
 
 	local function AddCheck(key, label)
+		label = T(label)
 		local btn = scroll:Add("DButton")
 		btn:Dock(TOP)
 		btn:DockMargin(0, 6, 12, 0)
@@ -246,6 +252,7 @@ function SCPArmory.OpenConfigMenu()
 
 	-- Slider fin façon RoN : étiquette, valeur rouge à droite, piste cliquable
 	local function AddNumber(key, label, minV, maxV)
+		label = T(label)
 		local pnl = scroll:Add("DPanel")
 		pnl:Dock(TOP)
 		pnl:DockMargin(0, 6, 12, 0)
@@ -306,17 +313,17 @@ function SCPArmory.OpenConfigMenu()
 	-- (défaut) et l'entrée « * » = tous les métiers ; pour les autres objets
 	-- aucun coché = visible par tous, comme avant
 	local function JobSummary(set, isWeapon)
-		if set["*"] then return "TOUS LES JOBS" end
+		if set["*"] then return T("TOUS LES JOBS") end
 		local names = {}
 		for nm in pairs(set) do
 			if nm ~= "*" then table.insert(names, nm) end
 		end
 		table.sort(names)
 		if #names == 0 then
-			return isWeapon and "PERSONNE (DÉFAUT)" or "TOUS LES JOBS"
+			return isWeapon and T("PERSONNE (DÉFAUT)") or T("TOUS LES JOBS")
 		end
 		if #names <= 2 then return SCPArmory.FrUpper(table.concat(names, ", ")) end
-		return #names .. " JOBS AUTORISÉS"
+		return #names .. " " .. T("JOBS AUTORISÉS")
 	end
 
 	local function OpenJobDropdown(btn, set, isWeapon)
@@ -371,8 +378,8 @@ function SCPArmory.OpenConfigMenu()
 			surface.DrawRect(0, 0, w, 2)
 			surface.SetDrawColor(COL.line)
 			surface.DrawOutlinedRect(0, 0, w, h, 1)
-			draw.SimpleText(isWeapon and "MÉTIERS — AUCUN COCHÉ = ARME DONNÉE À PERSONNE"
-				or "JOBS AUTORISÉS — AUCUN COCHÉ = TOUS", "SCPArmory_Cfg_Small", 8, 8, COL.dim)
+			draw.SimpleText(isWeapon and T("MÉTIERS — AUCUN COCHÉ = ARME DONNÉE À PERSONNE")
+				or T("JOBS AUTORISÉS — AUCUN COCHÉ = TOUS"), "SCPArmory_Cfg_Small", 8, 8, COL.dim)
 		end
 
 		local list = vgui.Create("DScrollPanel", pop)
@@ -404,7 +411,7 @@ function SCPArmory.OpenConfigMenu()
 					surface.SetDrawColor(COL.red)
 					surface.DrawRect(11, 8, 8, 8)
 				end
-				draw.SimpleText("TOUS LES MÉTIERS", "SCPArmory_Cfg_Small", 30, h / 2,
+				draw.SimpleText(T("TOUS LES MÉTIERS"), "SCPArmory_Cfg_Small", 30, h / 2,
 					set["*"] and COL.text or COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 				surface.SetDrawColor(COL.line)
 				surface.DrawRect(0, h - 1, w, 1)
@@ -470,7 +477,7 @@ function SCPArmory.OpenConfigMenu()
 		pnl:DockMargin(0, 4, 12, 0)
 		pnl:SetTall(26)
 		pnl.Paint = function(_, _, h)
-			draw.SimpleText("Préfixes de classes à charger (addon MRS…)", "SCPArmory_Cfg_Small",
+			draw.SimpleText(T("Préfixes de classes à charger (addon MRS…)"), "SCPArmory_Cfg_Small",
 				0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 		end
 
@@ -496,7 +503,7 @@ function SCPArmory.OpenConfigMenu()
 		pnl:DockMargin(0, 10, 12, 0)
 		pnl:SetTall(28)
 		pnl.Paint = function(_, _, h)
-			draw.SimpleText("Langue de l'interface (tous les joueurs)", "SCPArmory_Cfg_Small",
+			draw.SimpleText(T("Langue de l'interface (tous les joueurs)"), "SCPArmory_Cfg_Small",
 				0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 		end
 
@@ -548,7 +555,7 @@ function SCPArmory.OpenConfigMenu()
 		pnl:DockMargin(0, 8, 12, 0)
 		pnl:SetTall(2 + math.ceil(#THEMES / 3) * 28)
 		pnl.Paint = function(_, _, h)
-			draw.SimpleText("Style de l'interface", "SCPArmory_Cfg_Small",
+			draw.SimpleText(T("Style de l'interface"), "SCPArmory_Cfg_Small",
 				0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 		end
 
@@ -610,7 +617,7 @@ function SCPArmory.OpenConfigMenu()
 		pnl:DockMargin(0, 8, 12, 0)
 		pnl:SetTall(30)
 		pnl.Paint = function(_, w, h)
-			draw.SimpleText("Aperçu + couleurs prédéfinies", "SCPArmory_Cfg_Small",
+			draw.SimpleText(T("Aperçu + couleurs prédéfinies"), "SCPArmory_Cfg_Small",
 				0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 			-- Pastille d'aperçu, lue en direct sur les trois curseurs
 			local r = nums.UIColorR and nums.UIColorR.value or 190
@@ -665,7 +672,7 @@ function SCPArmory.OpenConfigMenu()
 		pnl:DockMargin(0, 6, 12, 0)
 		pnl:SetTall(26)
 		pnl.Paint = function(_, _, h)
-			draw.SimpleText(def.label, "SCPArmory_Cfg_Small",
+			draw.SimpleText(T(def.label), "SCPArmory_Cfg_Small",
 				0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 		end
 
@@ -694,7 +701,7 @@ function SCPArmory.OpenConfigMenu()
 		pnl:DockMargin(0, 8, 12, 0)
 		pnl:SetTall(26)
 		pnl.Paint = function(_, _, h)
-			draw.SimpleText("Modèle de l'armoire", "SCPArmory_Cfg_Small", 0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			draw.SimpleText(T("Modèle de l'armoire"), "SCPArmory_Cfg_Small", 0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 		end
 
 		lockerEntry = vgui.Create("DTextEntry", pnl)
@@ -766,7 +773,7 @@ function SCPArmory.OpenConfigMenu()
 			head:DockMargin(0, 10, 12, 2)
 			head:SetTall(18)
 			head.Paint = function()
-				draw.SimpleText(group.label, "SCPArmory_Cfg_Small", 0, 2, COL.faint)
+				draw.SimpleText(T(group.label), "SCPArmory_Cfg_Small", 0, 2, COL.faint)
 			end
 
 			for _, item in ipairs(shown) do
@@ -783,8 +790,8 @@ function SCPArmory.OpenConfigMenu()
 				row:SetTall(52)
 				row.Paint = function(_, w, h)
 					draw.SimpleText(item.name, "SCPArmory_Cfg_Small", 0, 4, COL.text)
-					draw.SimpleText("IMAGE", "SCPArmory_Cfg_Small", 250, 8, COL.faint)
-					draw.SimpleText("JOBS", "SCPArmory_Cfg_Small", 250, 32, COL.faint)
+					draw.SimpleText(T("IMAGE"), "SCPArmory_Cfg_Small", 250, 8, COL.faint)
+					draw.SimpleText(T("JOBS"), "SCPArmory_Cfg_Small", 250, 32, COL.faint)
 					surface.SetDrawColor(COL.line)
 					surface.DrawRect(0, h - 1, w, 1)
 				end
@@ -843,7 +850,7 @@ function SCPArmory.OpenConfigMenu()
 	saveBtn:SetText("")
 	saveBtn.Paint = function(s, w, h)
 		draw.RoundedBox(8, 0, 0, w, h, s:IsHovered() and COL.redHi or COL.red)
-		draw.SimpleText("ENREGISTRER ET DIFFUSER", "SCPArmory_Cfg_Label", w / 2, h / 2,
+		draw.SimpleText(T("ENREGISTRER ET DIFFUSER"), "SCPArmory_Cfg_Label", w / 2, h / 2,
 			COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
 	saveBtn.DoClick = function()
@@ -897,7 +904,7 @@ function SCPArmory.OpenConfigMenu()
 
 		local comp = util.Compress(util.TableToJSON(payload))
 		if not comp or #comp > 60000 then
-			chat.AddText(COL.red, "[ARMURERIE] ", COL.text, "Configuration trop volumineuse.")
+			chat.AddText(COL.red, "[ARMURERIE] ", COL.text, T("Configuration trop volumineuse."))
 			return
 		end
 
@@ -917,7 +924,7 @@ function SCPArmory.OpenConfigMenu()
 	cancelBtn.Paint = function(s, w, h)
 		surface.SetDrawColor(s:IsHovered() and COL.text or COL.line)
 		surface.DrawOutlinedRect(0, 0, w, h, 1)
-		draw.SimpleText("ANNULER", "SCPArmory_Cfg_Label", w / 2, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText(T("ANNULER"), "SCPArmory_Cfg_Label", w / 2, h / 2, COL.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
 	cancelBtn.DoClick = function() frame:Remove() end
 end

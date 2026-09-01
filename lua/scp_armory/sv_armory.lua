@@ -279,7 +279,8 @@ net.Receive("SCPArmory_ApplyBG", function(_, ply)
 	SCPArmory.StoredBG = SCPArmory.StoredBG or {}
 	SCPArmory.StoredBG[sid] = map
 
-	-- Mémorisé aussi dans le loadout pour le respawn automatique
+	-- Mémorisé aussi dans le dernier loadout (l'apparence, purement
+	-- cosmétique, est ré-appliquée au respawn — pas les armes)
 	if SCPArmory.Stored[sid] then SCPArmory.Stored[sid].bg = map end
 
 	SCPArmory.ApplyCustomBG(ply, map)
@@ -436,6 +437,13 @@ local function ApplyOverrides(data)
 	local pre = SCPArmory.Config.ForceLoadPrefixes
 	SCPArmory.Config.ForceLoadPrefixes = isstring(pre)
 		and string.gsub(string.lower(pre), "[^%w_,]", "") or "mrs_"
+
+	-- Le modèle d'armoire doit ressembler à un chemin de modèle .mdl
+	-- (l'entité re-vérifie avec util.IsValidModel à l'apparition)
+	local mdl = SCPArmory.Config.LockerModel
+	if not (isstring(mdl) and string.match(mdl, "^[%w_/%-%. ]+%.mdl$")) then
+		SCPArmory.Config.LockerModel = "models/props_c17/FurnitureDrawer001a.mdl"
+	end
 
 	-- Icônes : stockées même si l'objet n'existe pas encore
 	-- (armes auto-chargées après le chargement de la config).

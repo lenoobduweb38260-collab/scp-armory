@@ -232,6 +232,13 @@ local function Ease(t)
 	return t * t * (3 - 2 * t)
 end
 
+-- Petit « tic » sonore au survol des boutons, façon menu de jeu
+local function HoverCue(btn)
+	btn.OnCursorEntered = function()
+		surface.PlaySound("ui/buttonrollover.wav")
+	end
+end
+
 -- ---------------------------------------------------------------- persistence
 
 local function LoadSaved()
@@ -1157,6 +1164,13 @@ local function OpenMenu()
 		mwGloss.a = 12 + 22 * s.hf
 		draw.RoundedBox(br, 0, 0, w, math.floor(h / 2), mwGloss)
 
+		-- Éclat qui balaie le bouton par intervalles
+		local sweep = (RealTime() * 0.35) % 1
+		if sweep < 0.2 then
+			surface.SetDrawColor(255, 255, 255, 24)
+			surface.DrawRect((w + 60) * (sweep / 0.2) - 30, 2, 24, h - 4)
+		end
+
 		-- Liseré blanc qui s'allume au survol (style plat RoN)
 		if br == 0 and s.hf > 0.02 then
 			surface.SetDrawColor(255, 255, 255, 60 * s.hf)
@@ -1230,6 +1244,7 @@ local function OpenMenu()
 		s.flashT = RealTime()
 		DoDeploy()
 	end
+	HoverCue(deployBtn)
 
 	local RebuildColumn
 
@@ -1310,6 +1325,7 @@ local function OpenMenu()
 		draw.SimpleText("ESC", "SCPArmory_RoN_Small", w - 10, ty, COL.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 	end
 	backBtn.DoClick = GoBack
+	HoverCue(backBtn)
 
 	-- --------------------------------------------- construction de la liste
 
@@ -1908,6 +1924,7 @@ local function OpenMenu()
 			draw.SimpleText("ESC", "SCPArmory_RoN_Small", w - 12, ty, COL.faint, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
 		end
 		mwBack.DoClick = GoBack
+		HoverCue(mwBack)
 
 		local mwDeploy = vgui.Create("DButton", bar)
 		mwDeploy:SetPos(160, 0)
@@ -1931,6 +1948,13 @@ local function OpenMenu()
 			-- Relief : reflet permanent en tête, renforcé au survol
 			mwGloss.a = 14 + 26 * s.hf
 			draw.RoundedBox(12, 2, 2, w - 4, math.floor(h / 2) - 2, mwGloss)
+
+			-- Éclat qui balaie le bouton par intervalles
+			local sweep = (RealTime() * 0.35) % 1
+			if sweep < 0.2 then
+				surface.SetDrawColor(255, 255, 255, 24)
+				surface.DrawRect((w + 60) * (sweep / 0.2) - 30, 4, 24, h - 8)
+			end
 
 			if down then
 				btnPress.a = 60
@@ -1962,6 +1986,7 @@ local function OpenMenu()
 			s.flashT = RealTime()
 			DoDeploy()
 		end
+		HoverCue(mwDeploy)
 
 		local CARD_KEYS = { "primary", "secondary", "tactical1", "tactical2", "grenade", "armor", "helmet" }
 
@@ -1989,8 +2014,10 @@ local function OpenMenu()
 			local gap = 10
 			local cw = math.Clamp(math.floor((ScrW() - 160) / #keys) - gap, 116, 152)
 			local total = #keys * (cw + gap) - gap
-			strip:SetSize(total, ch)
-			strip:SetPos(math.floor((ScrW() - total) / 2) + 20, ScrH() - ch - 108)
+			-- Marge de tête (lévitation au survol) et de pied (course de
+			-- l'animation d'entrée) pour que rien ne soit rogné
+			strip:SetSize(total, ch + 42)
+			strip:SetPos(math.floor((ScrW() - total) / 2) + 20, ScrH() - ch - 118)
 
 			for i, key in ipairs(keys) do
 				local isApp = (key == "apparence")
@@ -2002,9 +2029,24 @@ local function OpenMenu()
 					or nil
 
 				local card = vgui.Create("DButton", strip)
-				card:SetPos((i - 1) * (cw + gap), 0)
+				local cx = (i - 1) * (cw + gap)
 				card:SetSize(cw, ch)
 				card:SetText("")
+
+				-- Entrée en cascade : la carte monte en fondu depuis le bas
+				card:SetPos(cx, 38)
+				card:SetAlpha(0)
+				card:AlphaTo(255, 0.22, 0.045 * i)
+				card:MoveTo(cx, 10, 0.3, 0.045 * i, 0.6)
+				card.introUntil = SysTime() + 0.045 * i + 0.34
+
+				-- Lévitation au survol (les enfants — modèle 3D — suivent)
+				card.Think = function(s)
+					if SysTime() < s.introUntil then return end
+					s:SetPos(cx, 10 - math.Round(6 * (s.hf or 0)))
+				end
+				HoverCue(card)
+
 				card.Paint = function(s, w, h)
 					s.hf = Lerp(FrameTime() * 10, s.hf or 0, s:IsHovered() and 1 or 0)
 
@@ -2022,6 +2064,10 @@ local function OpenMenu()
 					-- Pastille d'accent en tête, qui s'étire au survol
 					local nw = math.floor(w * (0.34 + 0.16 * s.hf))
 					draw.RoundedBox(2, math.floor((w - nw) / 2), 4, nw, 4, COL.red)
+
+					-- Numéro d'emplacement, façon sélection de killstreaks
+					draw.SimpleText(string.format("%02d", i), "SCPArmory_RoN_Small", 10, 7,
+						s.hf > 0.3 and COL.dim or COL.faint)
 
 					draw.SimpleText(isApp and T("APPARENCE") or T(slot.label), "SCPArmory_RoN_Label",
 						w / 2, 16, s.hf > 0.3 and COL.soft or COL.dim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)

@@ -9,7 +9,12 @@ local CACHE_DIR = "scp_armory/cache"
 
 -- Retourne le matériau d'une URL (nil tant que le téléchargement est en cours ou a échoué)
 function SCPArmory.GetWebMaterial(url)
-	if not isstring(url) or url == "" then return nil end
+	-- Défense en profondeur : URL http(s) uniquement et longueur bornée,
+	-- même si la config serveur les valide déjà
+	if not isstring(url) or url == "" or #url > 300
+		or not string.find(url, "^https?://") then
+		return nil
+	end
 
 	local cached = SCPArmory.WebIconCache[url]
 	if cached ~= nil then
@@ -27,7 +32,8 @@ function SCPArmory.GetWebMaterial(url)
 
 	SCPArmory.WebIconCache[url] = false
 	http.Fetch(url, function(body, _, _, code)
-		if code ~= 200 or not body or #body < 16 then return end
+		-- Réponse bornée : une image géante ne remplit pas le disque
+		if code ~= 200 or not body or #body < 16 or #body > 8 * 1024 * 1024 then return end
 		file.CreateDir(CACHE_DIR)
 		file.Write(fname, body)
 		SCPArmory.WebIconCache[url] = Material("data/" .. fname, "smooth")

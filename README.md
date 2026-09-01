@@ -42,9 +42,11 @@ restrictions par job et **chargement automatique des packs d'armes installés**.
   Avec `RequireEntity = true`, s'équiper n'est possible **qu'à proximité d'une armoire**.
 - **Sauvegarde locale** du dernier loadout : le menu se rouvre pré-rempli. Aucune
   réapplication automatique au respawn — il faut repasser à l'armurerie.
-- **Interface en 3 langues** : français (défaut), **allemand** et **polonais**. La langue se choisit
-  dans le panneau de configuration (section GÉNÉRAL) et s'applique en direct à tous les joueurs :
-  menu, notifications, menu d'apparence et étiquette 3D2D de l'armoire.
+- **Interface en 3 langues — jusqu'au panneau de configuration** : français (défaut),
+  **allemand** et **polonais**. La langue se choisit dans le panneau de configuration
+  (section GÉNÉRAL) et s'applique en direct à tous les joueurs : menu, notifications,
+  menu d'apparence, étiquette 3D2D de l'armoire **et panneau de configuration complet**
+  (sections, options, listes de métiers, boutons).
 - **2 styles d'interface au choix dans la config** : **READY OR NOT** (plat et épuré,
   fidèle au jeu — défaut) et **MODERN WARFARE** (la vue d'ensemble devient un écran de
   sélection façon **killstreaks** : grandes cartes **arrondies** à liseré d'accent en
