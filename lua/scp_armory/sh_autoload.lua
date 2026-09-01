@@ -6,9 +6,10 @@
 SCPArmory = SCPArmory or {}
 SCPArmory.ItemIcons = SCPArmory.ItemIcons or {} -- "pool/id" -> URL image
 SCPArmory.ItemJobs = SCPArmory.ItemJobs or {}   -- "pool/id" -> { "Job", ... }
+SCPArmory.ItemRanks = SCPArmory.ItemRanks or {} -- "pool/id" -> { "cat:idx", ... } (grades MRS)
 
--- Applique aux objets les icônes et restrictions de jobs configurées
--- (y compris pour les armes auto-chargées après coup)
+-- Applique aux objets les icônes et restrictions (jobs + grades MRS)
+-- configurées, y compris pour les armes auto-chargées après coup
 function SCPArmory.ApplyPendingItemConfig()
 	for key, url in pairs(SCPArmory.ItemIcons) do
 		local pool, id = string.match(key, "^([%w_]+)/([%w_]+)$")
@@ -21,6 +22,14 @@ function SCPArmory.ApplyPendingItemConfig()
 		local item = pool and SCPArmory.GetItem(pool, id)
 		if item then
 			item.jobs = (istable(jobs) and #jobs > 0) and jobs or nil
+		end
+	end
+
+	for key, ranks in pairs(SCPArmory.ItemRanks) do
+		local pool, id = string.match(key, "^([%w_]+)/([%w_]+)$")
+		local item = pool and SCPArmory.GetItem(pool, id)
+		if item then
+			item.ranks = (istable(ranks) and #ranks > 0) and ranks or nil
 		end
 	end
 end

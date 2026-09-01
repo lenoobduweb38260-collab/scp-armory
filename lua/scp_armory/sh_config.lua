@@ -94,10 +94,10 @@ SCPArmory.Config = {
 	-- Classes d'armes à ignorer lors du chargement automatique
 	AutoLoadBlacklist = {},
 
-	-- Packs d'armes supplémentaires (MRS…) : préfixes de classes, séparés
-	-- par des virgules, chargés dans les pools même si le pack ne marque pas
-	-- ses armes comme spawnables (pris en compte au prochain redémarrage)
-	ForceLoadPrefixes = "mrs_",
+	-- Packs d'armes non détectés automatiquement : préfixes de classes,
+	-- séparés par des virgules, chargés dans les pools même si le pack ne
+	-- marque pas ses armes comme spawnables (vide = détection normale seule)
+	ForceLoadPrefixes = "",
 }
 
 -- Majuscules compatibles avec les accents français (string.upper les ignore)
@@ -147,23 +147,53 @@ end
 -- (noms en minuscules, cochés dans le panneau de configuration en jeu)
 SCPArmory.AllowedBodygroups = SCPArmory.AllowedBodygroups or {}
 
--- Un objet réservé à certains jobs (champ item.jobs) est totalement invisible
--- pour les autres, comme dans Ready or Not : on ne voit que son arsenal.
---
--- Cas particuliers :
---   - une ARME (pools principale/secondaire, champ isWeapon) sans métier
---     assigné n'est donnée à PERSONNE — c'est le défaut : assignez les
---     métiers (ou TOUS) dans la config en jeu pour la rendre disponible ;
---   - l'entrée "*" dans item.jobs = tous les métiers.
+-- Un objet restreint est totalement invisible pour les autres, comme dans
+-- Ready or Not : on ne voit que son arsenal. Deux restrictions cumulables,
+-- réglées dans la config en jeu :
+--   - item.jobs  : liste de métiers ("*" = tous, "-" = DÉSACTIVÉ pour tous —
+--     même l'armure peut ainsi n'être donnée à personne) ;
+--   - item.ranks : liste de grades MRS "catégorie:indice" (pont sh_mrs).
+-- Quand les deux listes existent, il faut satisfaire LES DEUX (métier ET
+-- grade). Une ARME (champ isWeapon) sans aucune restriction assignée n'est
+-- donnée à PERSONNE — c'est le défaut ; les autres objets restent visibles
+-- par tous tant que rien n'est configuré.
 function SCPArmory.IsItemAvailable(ply, item)
-	if not item.jobs then
+	local jobs, ranks = item.jobs, item.ranks
+
+	-- « - » : objet désactivé pour tout le monde
+	if jobs then
+		for _, job in ipairs(jobs) do
+			if job == "-" then return false end
+		end
+	end
+
+	if not jobs and not ranks then
 		return not item.isWeapon
 	end
 	if not IsValid(ply) then return false end
 
-	local jobName = team.GetName(ply:Team())
-	for _, job in ipairs(item.jobs) do
-		if job == "*" or job == jobName then return true end
+	local jobOK = true
+	if jobs then
+		jobOK = false
+		local jobName = team.GetName(ply:Team())
+		for _, job in ipairs(jobs) do
+			if job == "*" or job == jobName then
+				jobOK = true
+				break
+			end
+		end
 	end
-	return false
+
+	local rankOK = true
+	if ranks then
+		rankOK = false
+		for _, rank in ipairs(ranks) do
+			if SCPArmory.MRSBridge.PlayerHasRank(ply, rank) then
+				rankOK = true
+				break
+			end
+		end
+	end
+
+	return jobOK and rankOK
 end

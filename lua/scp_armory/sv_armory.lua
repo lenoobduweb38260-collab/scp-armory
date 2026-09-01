@@ -432,11 +432,11 @@ local function ApplyOverrides(data)
 		end
 	end
 
-	-- Préfixes de packs forcés (MRS…) : minuscules, lettres/chiffres/_ et
-	-- virgules uniquement — tout le reste est retiré
+	-- Préfixes de packs forcés : minuscules, lettres/chiffres/_ et virgules
+	-- uniquement — tout le reste est retiré
 	local pre = SCPArmory.Config.ForceLoadPrefixes
 	SCPArmory.Config.ForceLoadPrefixes = isstring(pre)
-		and string.gsub(string.lower(pre), "[^%w_,]", "") or "mrs_"
+		and string.gsub(string.lower(pre), "[^%w_,]", "") or ""
 
 	-- Le modèle d'armoire doit ressembler à un chemin de modèle .mdl
 	-- (l'entité re-vérifie avec util.IsValidModel à l'apparition)
@@ -477,6 +477,26 @@ local function ApplyOverrides(data)
 		end
 	end
 
+	-- Restrictions par grade MRS : entrées "catégorie:indice", bornées
+	-- (24 grades max par objet, 96 caractères max par entrée)
+	if istable(data.ranks) then
+		local n = 0
+		for key, v in pairs(data.ranks) do
+			n = n + 1
+			if n > 512 then break end
+			if isstring(key) and string.match(key, "^[%w_]+/[%w_]+$") and istable(v) then
+				local list = {}
+				for _, id in ipairs(v) do
+					if isstring(id) and #id <= 96 and string.match(id, "^.+:%d+$") then
+						table.insert(list, id)
+					end
+					if #list >= 24 then break end
+				end
+				SCPArmory.ItemRanks[key] = (#list > 0) and list or nil
+			end
+		end
+	end
+
 	-- Bodygroups autorisés aux joueurs (32 noms max, 48 caractères max)
 	if istable(data.bgallow) then
 		local set, n = {}, 0
@@ -503,7 +523,13 @@ local function CurrentConfigPayload()
 	end
 	table.sort(bgallow)
 
-	return { config = cfg, icons = SCPArmory.ItemIcons, jobs = SCPArmory.ItemJobs, bgallow = bgallow }
+	return {
+		config = cfg,
+		icons = SCPArmory.ItemIcons,
+		jobs = SCPArmory.ItemJobs,
+		ranks = SCPArmory.ItemRanks,
+		bgallow = bgallow,
+	}
 end
 
 local function SaveConfigToDisk()
@@ -571,10 +597,11 @@ net.Receive("SCPArmory_SaveConfig", function(_, ply)
 	table.sort(changes)
 
 	SCPArmory.AddLog("CONFIG", string.format(
-		"%s a enregistré la configuration — %s ; icônes: %d, objets restreints par job: %d",
+		"%s a enregistré la configuration — %s ; icônes: %d, objets restreints par job: %d, par grade MRS: %d",
 		SCPArmory.PlayerTag(ply),
 		#changes > 0 and table.concat(changes, ", ") or "options inchangées",
-		table.Count(SCPArmory.ItemIcons), table.Count(SCPArmory.ItemJobs)), ply)
+		table.Count(SCPArmory.ItemIcons), table.Count(SCPArmory.ItemJobs),
+		table.Count(SCPArmory.ItemRanks)), ply)
 end)
 
 LoadConfigFromDisk()

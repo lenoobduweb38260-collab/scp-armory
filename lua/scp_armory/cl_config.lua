@@ -27,6 +27,7 @@ net.Receive("SCPArmory_Config", function()
 		for _, item in ipairs(items) do
 			item.icon = nil
 			item.jobs = nil
+			item.ranks = nil
 		end
 	end
 
@@ -48,6 +49,15 @@ net.Receive("SCPArmory_Config", function()
 		end
 	end
 
+	SCPArmory.ItemRanks = {}
+	if istable(data.ranks) then
+		for key, ranks in pairs(data.ranks) do
+			if isstring(key) and istable(ranks) and #ranks > 0 then
+				SCPArmory.ItemRanks[key] = ranks
+			end
+		end
+	end
+
 	SCPArmory.AllowedBodygroups = {}
 	if istable(data.bgallow) then
 		for _, name in ipairs(data.bgallow) do
@@ -58,8 +68,8 @@ net.Receive("SCPArmory_Config", function()
 	end
 
 	-- Re-passe du chargement automatique (sans doublons) : la config reçue
-	-- peut ajouter des préfixes de packs (MRS…) inconnus au démarrage local,
-	-- puis application des icônes / restrictions
+	-- peut ajouter des préfixes de packs inconnus au démarrage local, puis
+	-- application des icônes / restrictions (jobs + grades MRS)
 	SCPArmory.AutoLoadWeapons()
 end)
 
@@ -311,12 +321,13 @@ function SCPArmory.OpenConfigMenu()
 
 	-- isWeapon : pour une ARME, aucun métier coché = donnée à PERSONNE
 	-- (défaut) et l'entrée « * » = tous les métiers ; pour les autres objets
-	-- aucun coché = visible par tous, comme avant
+	-- aucun coché = visible par tous. « - » = désactivé pour tout le monde.
 	local function JobSummary(set, isWeapon)
+		if set["-"] then return T("DÉSACTIVÉ POUR TOUS") end
 		if set["*"] then return T("TOUS LES JOBS") end
 		local names = {}
 		for nm in pairs(set) do
-			if nm ~= "*" then table.insert(names, nm) end
+			if nm ~= "*" and nm ~= "-" then table.insert(names, nm) end
 		end
 		table.sort(names)
 		if #names == 0 then
@@ -324,6 +335,16 @@ function SCPArmory.OpenConfigMenu()
 		end
 		if #names <= 2 then return SCPArmory.FrUpper(table.concat(names, ", ")) end
 		return #names .. " " .. T("JOBS AUTORISÉS")
+	end
+
+	-- Résumé des grades MRS requis pour un objet
+	local function RankSummary(set)
+		local ids = {}
+		for id in pairs(set) do table.insert(ids, id) end
+		table.sort(ids)
+		if #ids == 0 then return T("AUCUN GRADE REQUIS") end
+		if #ids == 1 then return SCPArmory.MRSBridge.RankLabel(ids[1]) end
+		return #ids .. " " .. T("GRADES REQUIS")
 	end
 
 	local function OpenJobDropdown(btn, set, isWeapon)
@@ -353,7 +374,7 @@ function SCPArmory.OpenConfigMenu()
 		end
 
 		local rowH = 24
-		local extraRows = isWeapon and 1 or 0
+		local extraRows = 1 + (isWeapon and 1 or 0)
 		local listH = math.min((#names + extraRows) * rowH, 10 * rowH)
 		local popW = 340
 		local popH = listH + 30
@@ -393,38 +414,44 @@ function SCPArmory.OpenConfigMenu()
 		lbar.btnDown.Paint = function() end
 		lbar.btnGrip.Paint = function(_, w, h) draw.RoundedBox(2, 0, 0, w, h, COL.faint) end
 
-		-- Armes : première ligne « TOUS LES MÉTIERS » (coche l'entrée « * »
-		-- et remplace les métiers cochés individuellement)
-		if isWeapon then
-			local allRow = list:Add("DButton")
-			allRow:Dock(TOP)
-			allRow:SetTall(rowH)
-			allRow:SetText("")
-			allRow.Paint = function(s, w, h)
+		-- Lignes spéciales en tête : « DÉSACTIVÉ POUR TOUS » (tout objet —
+		-- même un gilet peut n'être donné à personne) et, pour les armes,
+		-- « TOUS LES MÉTIERS ». Chacune remplace les métiers cochés.
+		local function SpecialRow(label, mark, activeCol)
+			local row = list:Add("DButton")
+			row:Dock(TOP)
+			row:SetTall(rowH)
+			row:SetText("")
+			row.Paint = function(s, w, h)
 				if s:IsHovered() then
 					surface.SetDrawColor(255, 255, 255, 8)
 					surface.DrawRect(0, 0, w, h)
 				end
 				surface.SetDrawColor(s:IsHovered() and COL.text or COL.line)
 				surface.DrawOutlinedRect(8, 5, 14, 14, 1)
-				if set["*"] then
+				if set[mark] then
 					surface.SetDrawColor(COL.red)
 					surface.DrawRect(11, 8, 8, 8)
 				end
-				draw.SimpleText(T("TOUS LES MÉTIERS"), "SCPArmory_Cfg_Small", 30, h / 2,
-					set["*"] and COL.text or COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+				draw.SimpleText(label, "SCPArmory_Cfg_Small", 30, h / 2,
+					set[mark] and activeCol or COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 				surface.SetDrawColor(COL.line)
 				surface.DrawRect(0, h - 1, w, 1)
 			end
-			allRow.DoClick = function()
-				if set["*"] then
-					set["*"] = nil
+			row.DoClick = function()
+				if set[mark] then
+					set[mark] = nil
 				else
 					for k in pairs(set) do set[k] = nil end
-					set["*"] = true
+					set[mark] = true
 				end
 				surface.PlaySound("ui/buttonclick.wav")
 			end
+		end
+
+		SpecialRow(T("DÉSACTIVÉ POUR TOUS"), "-", COL.red)
+		if isWeapon then
+			SpecialRow(T("TOUS LES MÉTIERS"), "*", COL.text)
 		end
 
 		for _, nm in ipairs(names) do
@@ -452,9 +479,98 @@ function SCPArmory.OpenConfigMenu()
 				end
 			end
 			row.DoClick = function()
-				-- Cocher un métier précis remplace « TOUS LES MÉTIERS »
+				-- Cocher un métier précis remplace « TOUS » et « DÉSACTIVÉ »
 				set["*"] = nil
+				set["-"] = nil
 				set[nm] = (not set[nm]) or nil
+				surface.PlaySound("ui/buttonclick.wav")
+			end
+		end
+	end
+
+	-- Liste déroulante des grades MRS requis (catégorie — grade), cochables
+	local function OpenRankDropdown(btn, set)
+		ClosePopup()
+
+		local catcher = vgui.Create("DButton", frame)
+		frame.PopupCatcher = catcher
+		catcher:SetPos(0, 0)
+		catcher:SetSize(W, H)
+		catcher:SetText("")
+		catcher.Paint = function() end
+		catcher.DoClick = ClosePopup
+
+		-- Grades du serveur + grades déjà configurés mais disparus de MRS
+		local opts = SCPArmory.MRSBridge.RankOptions()
+		local seen = {}
+		for _, o in ipairs(opts) do seen[o.id] = true end
+		for id in pairs(set) do
+			if not seen[id] then
+				table.insert(opts, { id = id, label = SCPArmory.MRSBridge.RankLabel(id) })
+			end
+		end
+
+		local rowH = 24
+		local listH = math.min(#opts * rowH, 10 * rowH)
+		local popW = 380
+		local popH = listH + 30
+
+		local bx, by = btn:LocalToScreen(0, btn:GetTall())
+		local fx, fy = frame:LocalToScreen(0, 0)
+		local px = math.Clamp(bx - fx, 8, W - popW - 8)
+		local py = by - fy + 2
+		if py + popH > H - 8 then
+			py = (by - fy) - btn:GetTall() - popH - 2
+		end
+
+		local pop = vgui.Create("DPanel", frame)
+		openPopup = pop
+		pop:SetPos(px, py)
+		pop:SetSize(popW, popH)
+		pop:MoveToFront()
+		pop.Paint = function(_, w, h)
+			surface.SetDrawColor(12, 12, 15, 252)
+			surface.DrawRect(0, 0, w, h)
+			surface.SetDrawColor(COL.red)
+			surface.DrawRect(0, 0, w, 2)
+			surface.SetDrawColor(COL.line)
+			surface.DrawOutlinedRect(0, 0, w, h, 1)
+			draw.SimpleText(T("GRADES MRS — AUCUN COCHÉ = PAS DE CONDITION DE GRADE"),
+				"SCPArmory_Cfg_Small", 8, 8, COL.dim)
+		end
+
+		local list = vgui.Create("DScrollPanel", pop)
+		list:SetPos(1, 26)
+		list:SetSize(popW - 2, popH - 27)
+
+		local lbar = list:GetVBar()
+		lbar:SetWide(4)
+		lbar.Paint = function() end
+		lbar.btnUp.Paint = function() end
+		lbar.btnDown.Paint = function() end
+		lbar.btnGrip.Paint = function(_, w, h) draw.RoundedBox(2, 0, 0, w, h, COL.faint) end
+
+		for _, opt in ipairs(opts) do
+			local row = list:Add("DButton")
+			row:Dock(TOP)
+			row:SetTall(rowH)
+			row:SetText("")
+			row.Paint = function(s, w, h)
+				if s:IsHovered() then
+					surface.SetDrawColor(255, 255, 255, 8)
+					surface.DrawRect(0, 0, w, h)
+				end
+				surface.SetDrawColor(s:IsHovered() and COL.text or COL.line)
+				surface.DrawOutlinedRect(8, 5, 14, 14, 1)
+				if set[opt.id] then
+					surface.SetDrawColor(COL.red)
+					surface.DrawRect(11, 8, 8, 8)
+				end
+				draw.SimpleText(opt.label, "SCPArmory_Cfg_Small", 30, h / 2,
+					set[opt.id] and COL.text or COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			end
+			row.DoClick = function()
+				set[opt.id] = (not set[opt.id]) or nil
 				surface.PlaySound("ui/buttonclick.wav")
 			end
 		end
@@ -469,23 +585,23 @@ function SCPArmory.OpenConfigMenu()
 	AddCheck("MenuScene", "Fond d'armurerie dans le menu : râteliers derrière l'opérateur, établi sous l'arme")
 	AddNumber("UseDistance", "Portée autour de l'armoire (unités)", 60, 512)
 
-	-- Packs d'armes non détectés automatiquement (MRS…) : préfixes de classes
-	Note("Packs non détectés (MRS…) : préfixes de classes d'armes chargés même sans être spawnables, séparés par des virgules.")
+	-- Packs d'armes non détectés automatiquement : préfixes de classes
+	Note("Packs d'armes non détectés : préfixes de classes chargés même sans être spawnables, séparés par des virgules.")
 	do
 		local pnl = scroll:Add("DPanel")
 		pnl:Dock(TOP)
 		pnl:DockMargin(0, 4, 12, 0)
 		pnl:SetTall(26)
 		pnl.Paint = function(_, _, h)
-			draw.SimpleText(T("Préfixes de classes à charger (addon MRS…)"), "SCPArmory_Cfg_Small",
+			draw.SimpleText(T("Préfixes de classes à charger (packs spéciaux)"), "SCPArmory_Cfg_Small",
 				0, h / 2, COL.soft, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 		end
 
 		prefixEntry = vgui.Create("DTextEntry", pnl)
 		prefixEntry:Dock(RIGHT)
 		prefixEntry:SetWide(560)
-		prefixEntry:SetText(SCPArmory.Config.ForceLoadPrefixes or "mrs_")
-		StyleEntry(prefixEntry, "mrs_, autre_prefixe_")
+		prefixEntry:SetText(SCPArmory.Config.ForceLoadPrefixes or "")
+		StyleEntry(prefixEntry, "prefixe_a_, prefixe_b_")
 	end
 
 	-- Langue de l'interface : appliquée à tous les joueurs (menu, notifications,
@@ -751,12 +867,20 @@ function SCPArmory.OpenConfigMenu()
 
 	-- ----------------------------------------- objets : images + jobs
 
-	Section("OBJETS — IMAGE IMGUR ET JOBS AUTORISÉS")
+	Section("OBJETS — IMAGE IMGUR, JOBS ET GRADES MRS")
 	Note("Image : lien direct i.imgur.com en .png ou .jpg (vide = rendu 3D du modèle).")
 	Note("ARMES : par défaut une arme n'est donnée à PERSONNE. Cochez ses métiers, ou TOUS LES MÉTIERS pour tout le monde.")
 	Note("Autres objets (tactique, grenades, gilets, casques) : aucun job coché = visible par tous, comme avant.")
+	Note("DÉSACTIVÉ POUR TOUS (dans la liste des jobs) retire l'objet à tout le monde — même un gilet d'armure.")
 
-	local iconEntries, jobSelections = {}, {}
+	local mrsOK = SCPArmory.MRSBridge.Installed()
+	if mrsOK then
+		Note("Grades MRS : job ET grade se cumulent — si les deux sont réglés, il faut satisfaire les deux.")
+	else
+		Note("Addon MRS non détecté : les restrictions par grade seront disponibles quand MRS sera installé.")
+	end
+
+	local iconEntries, jobSelections, rankSelections = {}, {}, {}
 
 	for _, group in ipairs(POOL_LABELS) do
 		local items = SCPArmory.Items[group.pool] or {}
@@ -779,19 +903,26 @@ function SCPArmory.OpenConfigMenu()
 			for _, item in ipairs(shown) do
 				local key = group.pool .. "/" .. item.id
 
-				-- Sélection actuelle des jobs pour cet objet
+				-- Sélections actuelles des jobs et grades MRS pour cet objet
 				local set = {}
 				for _, nm in ipairs(SCPArmory.ItemJobs[key] or {}) do set[nm] = true end
 				jobSelections[key] = set
 
+				local rset = {}
+				for _, id in ipairs(SCPArmory.ItemRanks[key] or {}) do rset[id] = true end
+				rankSelections[key] = rset
+
 				local row = scroll:Add("DPanel")
 				row:Dock(TOP)
 				row:DockMargin(0, 3, 12, 0)
-				row:SetTall(52)
+				row:SetTall(mrsOK and 76 or 52)
 				row.Paint = function(_, w, h)
 					draw.SimpleText(item.name, "SCPArmory_Cfg_Small", 0, 4, COL.text)
 					draw.SimpleText(T("IMAGE"), "SCPArmory_Cfg_Small", 250, 8, COL.faint)
 					draw.SimpleText(T("JOBS"), "SCPArmory_Cfg_Small", 250, 32, COL.faint)
+					if mrsOK then
+						draw.SimpleText(T("GRADES"), "SCPArmory_Cfg_Small", 250, 56, COL.faint)
+					end
 					surface.SetDrawColor(COL.line)
 					surface.DrawRect(0, h - 1, w, 1)
 				end
@@ -831,12 +962,37 @@ function SCPArmory.OpenConfigMenu()
 					OpenJobDropdown(s, set, isWeaponPool)
 				end
 
+				-- Liste déroulante des grades MRS requis (si MRS est présent)
+				local rankBtn
+				if mrsOK then
+					rankBtn = vgui.Create("DButton", row)
+					rankBtn:SetText("")
+					rankBtn.Paint = function(s, w, h)
+						surface.SetDrawColor(COL.field)
+						surface.DrawRect(0, 0, w, h)
+						surface.SetDrawColor(s:IsHovered() and COL.red or COL.line)
+						surface.DrawOutlinedRect(0, 0, w, h, 1)
+						local summary = RankSummary(rset)
+						draw.SimpleText(summary, "SCPArmory_Cfg_Small", 6, h / 2,
+							next(rset) and COL.text or COL.faint, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+						draw.SimpleText("▼", "SCPArmory_Cfg_Small", w - 8, h / 2, COL.dim, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+					end
+					rankBtn.DoClick = function(s)
+						surface.PlaySound("ui/buttonclick.wav")
+						OpenRankDropdown(s, rset)
+					end
+				end
+
 				row.PerformLayout = function(_, w, h)
 					prev:SetPos(w - 70, 4)
 					iconEntry:SetPos(300, 4)
 					iconEntry:SetSize(w - 380, 20)
 					jobBtn:SetPos(300, 28)
 					jobBtn:SetSize(w - 380, 20)
+					if rankBtn then
+						rankBtn:SetPos(300, 52)
+						rankBtn:SetSize(w - 380, 20)
+					end
 				end
 			end
 		end
@@ -889,6 +1045,14 @@ function SCPArmory.OpenConfigMenu()
 			for nm in pairs(set) do table.insert(list, nm) end
 			table.sort(list)
 			payload.jobs[key] = list
+		end
+
+		payload.ranks = {}
+		for key, set in pairs(rankSelections) do
+			local list = {}
+			for id in pairs(set) do table.insert(list, id) end
+			table.sort(list)
+			payload.ranks[key] = list
 		end
 
 		-- Bodygroups autorisés : fusion avec l'existant (les noms d'autres

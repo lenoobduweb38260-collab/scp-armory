@@ -239,6 +239,25 @@ local function HoverCue(btn)
 	end
 end
 
+-- Silhouette d'un accessoire ARC9 (la même icône que dans le menu spawn,
+-- comme dans Ready or Not), ajustée à la zone en gardant les proportions.
+-- Retourne true si une icône a été dessinée.
+local function DrawAttIcon(attId, x, y, w, h, col)
+	local mat = SCPArmory.ARC9Bridge.AttIcon(attId)
+	if not mat then return false end
+
+	local mw, mh = mat:Width(), mat:Height()
+	if mw <= 0 or mh <= 0 then mw, mh = 1, 1 end
+	local scale = math.min(w / mw, h / mh)
+	local dw, dh = mw * scale, mh * scale
+
+	surface.SetDrawColor(col.r, col.g, col.b, col.a or 255)
+	surface.SetMaterial(mat)
+	surface.DrawTexturedRect(math.floor(x + (w - dw) / 2), math.floor(y + (h - dh) / 2),
+		math.floor(dw), math.floor(dh))
+	return true
+end
+
 -- ---------------------------------------------------------------- persistence
 
 local function LoadSaved()
@@ -1042,15 +1061,24 @@ local function OpenMenu()
 			if #slots == 0 then
 				draw.SimpleText(T("AUCUN EMPLACEMENT D'ACCESSOIRE"), "SCPArmory_RoN_Small", 16, y, COL.faint)
 			end
+			-- Lignes façon Ready or Not : silhouette de l'accessoire à
+			-- gauche, emplacement en petit au-dessus du nom
 			for _, slot in ipairs(slots) do
 				local installed = attSel[curWeaponKey][slot.index]
 				local name = installed and SCPArmory.FrUpper(SCPArmory.ARC9Bridge.AttName(installed)) or "—"
-				draw.SimpleText(name, "SCPArmory_RoN_Small", 16, y, installed and COL.text or COL.faint)
-				draw.SimpleText(slot.name, "SCPArmory_RoN_Small", w - 16, y, COL.red, TEXT_ALIGN_RIGHT)
+
+				if installed and DrawAttIcon(installed, 16, y, 44, 28, COL.soft) then
+					-- icône dessinée
+				else
+					draw.SimpleText("—", "SCPArmory_RoN_Small", 38, y + 8,
+						COL.faint, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				end
+				draw.SimpleText(slot.name, "SCPArmory_RoN_Small", 70, y, COL.red)
+				draw.SimpleText(name, "SCPArmory_RoN_Small", 70, y + 14, installed and COL.text or COL.faint)
 				surface.SetDrawColor(COL.lineF)
-				surface.DrawRect(16, y + 17, w - 32, 1)
-				y = y + 24
-				if y > h - 20 then break end
+				surface.DrawRect(16, y + 30, w - 32, 1)
+				y = y + 36
+				if y > h - 32 then break end
 			end
 		else
 			draw.SimpleText(T("ARME NON ARC9 — PAS DE RAIL"), "SCPArmory_RoN_Small", 16, y, COL.faint)
@@ -1600,6 +1628,11 @@ local function OpenMenu()
 				draw.SimpleText(aslot.name, "SCPArmory_RoN_Label", ox, 6, COL.dim)
 				DrawSpacedText(name, "SCPArmory_RoN_NameSm", ox, 24,
 					installed and (hov and COL.text or COL.soft) or COL.faint, 1)
+
+				-- Silhouette de l'accessoire posé (icône du menu spawn)
+				if installed then
+					DrawAttIcon(installed, w - 76, 8, 62, 36, hov and COL.text or COL.soft)
+				end
 			end
 			btn.DoClick = function()
 				mode = "attselect"
@@ -1674,7 +1707,7 @@ local function OpenMenu()
 			local btn = scroll:Add("DButton")
 			btn:Dock(TOP)
 			btn:DockMargin(0, 0, 10, rowGap)
-			btn:SetTall(44)
+			btn:SetTall(48)
 			btn:SetText("")
 			btn.Paint = function(s, w, h)
 				local equipped = attSel[curWeaponKey][attSlot.index] == att.id
@@ -1687,10 +1720,16 @@ local function OpenMenu()
 					surface.DrawRect(0, 3, 3, h - 6)
 				end
 
+				-- Disposition façon Ready or Not : silhouette à gauche
+				-- (icône du menu spawn), catégorie en petit au-dessus du nom
 				local ox = 12 + math.Round(s.hf * 6)
-				DrawSpacedText(att.name, "SCPArmory_RoN_NameSm", ox, 6,
+				if not DrawAttIcon(att.id, ox, 7, 56, 34, (equipped or hov) and COL.text or COL.soft) then
+					draw.SimpleText("—", "SCPArmory_RoN_Small", ox + 28, h / 2,
+						COL.faint, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				end
+				draw.SimpleText(att.cat, "SCPArmory_RoN_Small", ox + 68, 7, COL.red)
+				DrawSpacedText(att.name, "SCPArmory_RoN_NameSm", ox + 68, 21,
 					(equipped or hov) and COL.text or COL.soft, 1)
-				draw.SimpleText(att.cat, "SCPArmory_RoN_Small", w - 12, 26, COL.red, TEXT_ALIGN_RIGHT)
 			end
 			btn.OnCursorEntered = function() hoverAtt = att end
 			btn.DoClick = function() pick(att.id) end

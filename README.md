@@ -61,13 +61,23 @@ restrictions par job et **chargement automatique des packs d'armes installés**.
 - **Armes données à PERSONNE par défaut** : une arme (pools principale/secondaire,
   packs auto-chargés compris) n'apparaît pour **aucun joueur** tant que ses métiers ne
   sont pas assignés dans la config (section OBJETS) — cochez ses métiers, ou **TOUS
-  LES MÉTIERS** pour la rendre disponible à tout le monde. Les emplacements « Sans
-  arme » et les autres objets (tactique, gilets, casques) restent visibles par tous.
-- **Packs d'armes non détectés (addon MRS…)** : champ « Préfixes de classes à
-  charger » dans la config (section GÉNÉRAL, défaut `mrs_`) — les armes dont la classe
-  commence par un de ces préfixes sont chargées dans les pools même si le pack ne les
-  marque pas comme spawnables, rangées selon leur prise en main (pistolet =
-  secondaire). Pris en compte immédiatement à l'enregistrement de la config.
+  LES MÉTIERS** pour la rendre disponible à tout le monde.
+- **Tout objet peut être désactivé pour tout le monde** : l'option **DÉSACTIVÉ POUR
+  TOUS** dans la liste des jobs retire l'objet à tous les joueurs — un gilet d'armure
+  peut ainsi n'être donné à personne. Sans réglage, les objets non-armes (tactique,
+  grenades, gilets, casques) restent visibles par tous.
+- **Intégration MRS (Advanced Rank System)** : quand l'addon MRS est installé, chaque
+  objet peut aussi exiger un ou plusieurs **grades MRS** (« catégorie — grade », listés
+  automatiquement depuis MRS). Restriction **par job, par grade, ou les deux** : si
+  métiers ET grades sont réglés sur un objet, le joueur doit satisfaire **les deux**.
+  Vérifié à l'affichage **et** au déploiement, côté serveur.
+- **Packs d'armes non détectés** : champ « Préfixes de classes à charger » dans la
+  config (section GÉNÉRAL) — les armes dont la classe commence par un de ces préfixes
+  sont chargées dans les pools même si le pack ne les marque pas comme spawnables.
+  Pris en compte immédiatement à l'enregistrement de la config.
+- **Icônes d'accessoires façon Ready or Not** : les écrans MODIFIER L'ARME et CHOIX
+  D'ACCESSOIRE affichent la **silhouette de chaque accessoire ARC9** (la même icône
+  que dans le menu spawn), à gauche du nom avec l'emplacement en petit au-dessus.
 - **Couleur d'accent configurable partout** (menu, apparence, panneau de config) :
   curseurs RVB + 8 couleurs prédéfinies avec aperçu en direct dans la config en jeu.
 - **Mise à jour automatique au démarrage** (dossier [`maj-auto/`](maj-auto/LISEZMOI.md)) :
@@ -115,7 +125,7 @@ configuration en jeu) :
 | --- | --- |
 | `AutoLoadWeapons` | Charge automatiquement les armes des packs installés (redémarrage requis) |
 | `AutoLoadBlacklist` | Classes d'armes à exclure du chargement automatique |
-| `ForceLoadPrefixes` | Préfixes de classes chargés même sans être spawnables (addon MRS… — défaut `mrs_`) |
+| `ForceLoadPrefixes` | Préfixes de classes chargés même sans être spawnables (packs non détectés) |
 | `MenuBGRonURL` / `MenuBGRonWeaponURL` | Fonds personnalisés (URL https) du style Ready or Not — opérateur / arme |
 | `MenuBGMwURL` / `MenuBGMwWeaponURL` | Fonds personnalisés (URL https) du style Modern Warfare — cartes / arme |
 | `RequireEntity` | Si `true`, menu et déploiement uniquement près d'une armoire `scp_armory_locker` |

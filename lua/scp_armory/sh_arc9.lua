@@ -65,6 +65,29 @@ function Bridge.AttName(attId)
 	return tostring(att.CompactName or att.PrintName or attId)
 end
 
+-- Icône d'un accessoire : la même silhouette que celle des entités du menu
+-- spawn ARC9 (champ Icon du registre). Retourne un IMaterial ou nil.
+local attIconCache = {}
+function Bridge.AttIcon(attId)
+	local cached = attIconCache[attId]
+	if cached ~= nil then
+		return cached or nil -- false = déjà cherché, rien trouvé
+	end
+
+	local att = Bridge.GetAtt(attId)
+	local ic = istable(att) and att.Icon or nil
+	if isstring(ic) and ic ~= "" then
+		ic = Material(ic, "smooth mips")
+	end
+
+	-- Le champ Icon peut contenir n'importe quoi selon le pack : pcall
+	local ok, bad = pcall(function() return ic:IsError() end)
+	if not ok or bad then ic = false end
+
+	attIconCache[attId] = ic
+	return ic or nil
+end
+
 -- Accessoires du registre ARC9 compatibles avec les catégories d'un emplacement
 -- Retour trié : { { id, name, cat, desc }, ... }
 function Bridge.GetCompatible(cats)
