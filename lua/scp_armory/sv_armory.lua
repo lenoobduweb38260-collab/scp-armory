@@ -477,6 +477,24 @@ local function ApplyOverrides(data)
 		end
 	end
 
+	-- Noms personnalisés des objets : bornés à 64 caractères, sans
+	-- caractères de contrôle ; chaîne vide = retour au nom d'origine
+	if istable(data.names) then
+		local n = 0
+		for key, v in pairs(data.names) do
+			n = n + 1
+			if n > 512 then break end
+			if isstring(key) and string.match(key, "^[%w_]+/[%w_]+$") and isstring(v) then
+				v = string.Trim(string.gsub(v, "%c", ""))
+				if v == "" then
+					SCPArmory.ItemNames[key] = nil
+				elseif #v <= 64 then
+					SCPArmory.ItemNames[key] = v
+				end
+			end
+		end
+	end
+
 	-- Restrictions par grade MRS : entrées "catégorie:indice", bornées
 	-- (24 grades max par objet, 96 caractères max par entrée)
 	if istable(data.ranks) then
@@ -528,6 +546,7 @@ local function CurrentConfigPayload()
 		icons = SCPArmory.ItemIcons,
 		jobs = SCPArmory.ItemJobs,
 		ranks = SCPArmory.ItemRanks,
+		names = SCPArmory.ItemNames,
 		bgallow = bgallow,
 	}
 end

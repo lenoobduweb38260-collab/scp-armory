@@ -176,6 +176,18 @@ local WEAPON_KEYS = { "primary", "secondary" }
 
 local activeMenu = nil
 
+-- Fermeture en fondu du menu d'armurerie ouvert, de n'importe où :
+-- utilisée par le bouton CONFIGURATION et à la réception d'une nouvelle
+-- configuration (le menu ouvert ne peut pas rester sur des objets périmés)
+function SCPArmory.CloseLoadoutMenu()
+	local f = activeMenu
+	if not IsValid(f) or f.closing then return end
+	f.closing = true
+	f:AlphaTo(0, 0.14, 0, function()
+		if IsValid(f) then f:Remove() end
+	end)
+end
+
 -- Traduction (français par défaut, allemand/polonais selon la config serveur)
 local function T(s) return SCPArmory.T(s) end
 
@@ -919,6 +931,9 @@ local function OpenMenu()
 				s:IsHovered() and COL.text or COL.dim, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 		cfgBtn.DoClick = function()
+			-- L'armurerie se ferme d'abord : le panneau de configuration ne
+			-- peut pas modifier des objets affichés par un menu encore ouvert
+			SCPArmory.CloseLoadoutMenu()
 			if SCPArmory.OpenConfigMenu then SCPArmory.OpenConfigMenu() end
 		end
 	end

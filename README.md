@@ -34,9 +34,13 @@ restrictions par job et **chargement automatique des packs d'armes installés**.
 - **Icônes par images imgur** : chaque objet peut avoir une image (lien direct
   `https://i.imgur.com/xxxx.png`), qui remplace le rendu 3D dans les vignettes, les listes et le
   grand plan. Téléchargées une fois puis mises en cache dans `data/scp_armory/cache/`.
-- **Panneau de configuration en jeu** (superadmin) : options générales, image imgur **et jobs
-  autorisés de chaque objet**, avec aperçu. Sauvegardé côté serveur
+- **Panneau de configuration en jeu** (superadmin) : options générales et, pour chaque
+  objet, **nom personnalisé** (renommez n'importe quel objet, vide = nom d'origine),
+  image imgur, **jobs et grades MRS autorisés**, avec aperçu. Sauvegardé côté serveur
   (`data/scp_armory/server_config.json`) et diffusé à tous les joueurs en direct.
+  Le bouton CONFIGURATION de l'armurerie (visible des superadmins uniquement) **ferme
+  d'abord le menu de loadout** ; toute nouvelle configuration reçue referme aussi les
+  menus ouverts — aucun écran ne reste sur des objets périmés.
 - **Entité armoire d'armurerie** (`scp_armory_locker`) : une armoire à placer sur la map (menu spawn,
   catégorie *SCP Armory*, modèle configurable), étiquette 3D2D « ARMURERIE — Appuyez sur [E] ».
   Avec `RequireEntity = true`, s'équiper n'est possible **qu'à proximité d'une armoire**.

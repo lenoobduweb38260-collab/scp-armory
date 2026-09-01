@@ -7,10 +7,32 @@ SCPArmory = SCPArmory or {}
 SCPArmory.ItemIcons = SCPArmory.ItemIcons or {} -- "pool/id" -> URL image
 SCPArmory.ItemJobs = SCPArmory.ItemJobs or {}   -- "pool/id" -> { "Job", ... }
 SCPArmory.ItemRanks = SCPArmory.ItemRanks or {} -- "pool/id" -> { "cat:idx", ... } (grades MRS)
+SCPArmory.ItemNames = SCPArmory.ItemNames or {} -- "pool/id" -> nom personnalisé
 
--- Applique aux objets les icônes et restrictions (jobs + grades MRS)
--- configurées, y compris pour les armes auto-chargées après coup
+-- Applique aux objets les noms, icônes et restrictions (jobs + grades MRS)
+-- configurés, y compris pour les armes auto-chargées après coup
 function SCPArmory.ApplyPendingItemConfig()
+	-- Remise à zéro d'abord : un nom ou une restriction RETIRÉ de la config
+	-- doit aussi disparaître des objets, côté serveur comme côté client,
+	-- sans redémarrage
+	for _, items in pairs(SCPArmory.Items) do
+		for _, item in ipairs(items) do
+			item.icon = nil
+			item.jobs = nil
+			item.ranks = nil
+			if item.origName then item.name = item.origName end
+		end
+	end
+
+	for key, nm in pairs(SCPArmory.ItemNames) do
+		local pool, id = string.match(key, "^([%w_]+)/([%w_]+)$")
+		local item = pool and SCPArmory.GetItem(pool, id)
+		if item then
+			item.origName = item.origName or item.name
+			item.name = nm
+		end
+	end
+
 	for key, url in pairs(SCPArmory.ItemIcons) do
 		local pool, id = string.match(key, "^([%w_]+)/([%w_]+)$")
 		local item = pool and SCPArmory.GetItem(pool, id)

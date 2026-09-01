@@ -16,21 +16,21 @@ net.Receive("SCPArmory_Config", function()
 	local data = util.JSONToTable(util.Decompress(net.ReadData(len) or "", 1048576) or "")
 	if not istable(data) then return end
 
+	-- Une nouvelle configuration arrive : le menu d'armurerie ouvert se
+	-- ferme en fondu plutôt que d'afficher des objets périmés (noms,
+	-- restrictions ou pools qui viennent de changer)
+	if isfunction(SCPArmory.CloseLoadoutMenu) then
+		SCPArmory.CloseLoadoutMenu()
+	end
+
 	if istable(data.config) then
 		for k, v in pairs(data.config) do
 			SCPArmory.Config[k] = v
 		end
 	end
 
-	-- Remise à zéro puis application des icônes / restrictions reçues
-	for _, items in pairs(SCPArmory.Items) do
-		for _, item in ipairs(items) do
-			item.icon = nil
-			item.jobs = nil
-			item.ranks = nil
-		end
-	end
-
+	-- Les tables reçues remplacent les locales ; la remise à zéro des objets
+	-- (noms, icônes, restrictions) est faite par ApplyPendingItemConfig
 	SCPArmory.ItemIcons = {}
 	if istable(data.icons) then
 		for key, url in pairs(data.icons) do
@@ -54,6 +54,15 @@ net.Receive("SCPArmory_Config", function()
 		for key, ranks in pairs(data.ranks) do
 			if isstring(key) and istable(ranks) and #ranks > 0 then
 				SCPArmory.ItemRanks[key] = ranks
+			end
+		end
+	end
+
+	SCPArmory.ItemNames = {}
+	if istable(data.names) then
+		for key, nm in pairs(data.names) do
+			if isstring(key) and isstring(nm) and nm ~= "" then
+				SCPArmory.ItemNames[key] = nm
 			end
 		end
 	end
@@ -131,6 +140,12 @@ function SCPArmory.OpenConfigMenu()
 	if not LocalPlayer():IsSuperAdmin() then
 		chat.AddText(COL.red, "[ARMURERIE] ", COL.text, T("Réservé aux superadmins."))
 		return
+	end
+
+	-- L'armurerie ouverte se ferme en fond : configurer des objets encore
+	-- affichés par le menu de loadout provoquerait des états périmés
+	if isfunction(SCPArmory.CloseLoadoutMenu) then
+		SCPArmory.CloseLoadoutMenu()
 	end
 
 	if IsValid(activeConfig) then activeConfig:Remove() end
@@ -867,7 +882,8 @@ function SCPArmory.OpenConfigMenu()
 
 	-- ----------------------------------------- objets : images + jobs
 
-	Section("OBJETS — IMAGE IMGUR, JOBS ET GRADES MRS")
+	Section("OBJETS — NOM, IMAGE IMGUR, JOBS ET GRADES MRS")
+	Note("Nom : renommez l'objet pour tous les joueurs (vide = nom d'origine).")
 	Note("Image : lien direct i.imgur.com en .png ou .jpg (vide = rendu 3D du modèle).")
 	Note("ARMES : par défaut une arme n'est donnée à PERSONNE. Cochez ses métiers, ou TOUS LES MÉTIERS pour tout le monde.")
 	Note("Autres objets (tactique, grenades, gilets, casques) : aucun job coché = visible par tous, comme avant.")
@@ -881,6 +897,7 @@ function SCPArmory.OpenConfigMenu()
 	end
 
 	local iconEntries, jobSelections, rankSelections = {}, {}, {}
+	local nameEntries = {}
 
 	for _, group in ipairs(POOL_LABELS) do
 		local items = SCPArmory.Items[group.pool] or {}
@@ -915,13 +932,14 @@ function SCPArmory.OpenConfigMenu()
 				local row = scroll:Add("DPanel")
 				row:Dock(TOP)
 				row:DockMargin(0, 3, 12, 0)
-				row:SetTall(mrsOK and 76 or 52)
+				row:SetTall(mrsOK and 100 or 76)
 				row.Paint = function(_, w, h)
 					draw.SimpleText(item.name, "SCPArmory_Cfg_Small", 0, 4, COL.text)
-					draw.SimpleText(T("IMAGE"), "SCPArmory_Cfg_Small", 250, 8, COL.faint)
-					draw.SimpleText(T("JOBS"), "SCPArmory_Cfg_Small", 250, 32, COL.faint)
+					draw.SimpleText(T("NOM"), "SCPArmory_Cfg_Small", 250, 8, COL.faint)
+					draw.SimpleText(T("IMAGE"), "SCPArmory_Cfg_Small", 250, 32, COL.faint)
+					draw.SimpleText(T("JOBS"), "SCPArmory_Cfg_Small", 250, 56, COL.faint)
 					if mrsOK then
-						draw.SimpleText(T("GRADES"), "SCPArmory_Cfg_Small", 250, 56, COL.faint)
+						draw.SimpleText(T("GRADES"), "SCPArmory_Cfg_Small", 250, 80, COL.faint)
 					end
 					surface.SetDrawColor(COL.line)
 					surface.DrawRect(0, h - 1, w, 1)
@@ -938,6 +956,12 @@ function SCPArmory.OpenConfigMenu()
 						SCPArmory.DrawWebIcon(url, 2, 2, w - 4, h - 4)
 					end
 				end
+
+				-- Nom personnalisé de l'objet (vide = nom d'origine)
+				local nameEntry = vgui.Create("DTextEntry", row)
+				nameEntry:SetText(SCPArmory.ItemNames[key] or "")
+				StyleEntry(nameEntry, item.origName or item.name)
+				nameEntries[key] = nameEntry
 
 				local iconEntry = vgui.Create("DTextEntry", row)
 				iconEntry:SetText(SCPArmory.ItemIcons[key] or "")
@@ -985,12 +1009,14 @@ function SCPArmory.OpenConfigMenu()
 
 				row.PerformLayout = function(_, w, h)
 					prev:SetPos(w - 70, 4)
-					iconEntry:SetPos(300, 4)
+					nameEntry:SetPos(300, 4)
+					nameEntry:SetSize(w - 380, 20)
+					iconEntry:SetPos(300, 28)
 					iconEntry:SetSize(w - 380, 20)
-					jobBtn:SetPos(300, 28)
+					jobBtn:SetPos(300, 52)
 					jobBtn:SetSize(w - 380, 20)
 					if rankBtn then
-						rankBtn:SetPos(300, 52)
+						rankBtn:SetPos(300, 76)
 						rankBtn:SetSize(w - 380, 20)
 					end
 				end
@@ -1053,6 +1079,12 @@ function SCPArmory.OpenConfigMenu()
 			for id in pairs(set) do table.insert(list, id) end
 			table.sort(list)
 			payload.ranks[key] = list
+		end
+
+		-- Noms personnalisés (vide = retour au nom d'origine)
+		payload.names = {}
+		for key, entry in pairs(nameEntries) do
+			payload.names[key] = string.Trim(entry:GetValue() or "")
 		end
 
 		-- Bodygroups autorisés : fusion avec l'existant (les noms d'autres
